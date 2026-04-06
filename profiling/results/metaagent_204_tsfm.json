@@ -1,0 +1,41 @@
+{
+  "scenario_id": "204",
+  "domain": "tsfm",
+  "question": "Is TTM (Tiny Time Mixture), a time series model supported?",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Summary\n\n**Yes, TTM (Tiny Time Mixture) is supported.** The system provides four pre-trained TinyTimeMixer model checkpoints available for time series forecasting tasks:\n\n- **ttm_96_28** \u2014 Context length 96, prediction length 28\n- **ttm_512_96** \u2014 Context length 512, prediction length 96\n- **ttm_energy_96_28** \u2014 Energy-tuned variant, context length 96\n- **ttm_energy_512_96** \u2014 Energy-tuned variant, context length 512\n\nThese models can be used for multivariate forecasting, finetuning, and model evaluation tasks within the industrial asset operations system.",
+  "total_time_seconds": 5.751426417002222,
+  "num_tool_calls": 2,
+  "tool_call_sequence": [
+    "TSFMAgent/get_ai_tasks",
+    "TSFMAgent/get_tsfm_models"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 3113,
+    "completion_tokens": 353,
+    "total_tokens": 3466,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 0.5,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "TSFMAgent",
+      "tool": "get_ai_tasks",
+      "duration_seconds": 0.43730483300169,
+      "success": true
+    },
+    {
+      "step": 2,
+      "agent": "TSFMAgent",
+      "tool": "get_tsfm_models",
+      "duration_seconds": 0.4142654579918599,
+      "success": true
+    }
+  ]
+}

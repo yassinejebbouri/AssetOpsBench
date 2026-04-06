@@ -1,0 +1,23 @@
+{
+  "scenario_id": "404",
+  "domain": "wo",
+  "question": "Get the events of equipment CWC04009 for year 2019 and provide a summary based on the event group, such as work order event, alerts and anomaly events.",
+  "orchestrator_type": "AgentHive",
+  "answer": "",
+  "total_time_seconds": 29.879370208000182,
+  "num_tool_calls": 0,
+  "tool_call_sequence": [],
+  "tokens_used": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "num_llm_calls": 0
+  },
+  "tool_call_accuracy": 0.0,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": []
+}

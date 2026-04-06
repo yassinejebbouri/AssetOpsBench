@@ -1,0 +1,33 @@
+{
+  "scenario_id": "2",
+  "domain": "iot",
+  "question": "Can you list the IoT sites?",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# IoT Sites\n\nBased on the system query, there is **1 IoT site** currently configured:\n\n- **MAIN**",
+  "total_time_seconds": 4.805803499999456,
+  "num_tool_calls": 1,
+  "tool_call_sequence": [
+    "IoTAgent/sites"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 2657,
+    "completion_tokens": 90,
+    "total_tokens": 2747,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 1.0,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "IoTAgent",
+      "tool": "sites",
+      "duration_seconds": 0.29116962500847876,
+      "success": true
+    }
+  ]
+}

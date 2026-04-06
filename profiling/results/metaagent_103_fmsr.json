@@ -1,0 +1,33 @@
+{
+  "scenario_id": "103",
+  "domain": "fmsr",
+  "question": "List all failure modes of asset Wind Turbine.",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Summary\n\nUnable to retrieve the failure modes for the Wind Turbine asset. The system encountered a **rate limit error** when attempting to query the Failure Mode and Service Request (FMSR) Agent. The Watson AI service temporarily blocked the request due to exceeding the rate limit of 2 requests per second.\n\n**Recommendation:** Retry the request after a brief delay to obtain the failure modes list.",
+  "total_time_seconds": 6.976376416001585,
+  "num_tool_calls": 1,
+  "tool_call_sequence": [
+    "FMSRAgent/get_failure_modes"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 2846,
+    "completion_tokens": 178,
+    "total_tokens": 3024,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 0.5,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "FMSRAgent",
+      "tool": "get_failure_modes",
+      "duration_seconds": 3.0064390410116175,
+      "success": true
+    }
+  ]
+}
