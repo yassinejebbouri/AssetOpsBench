@@ -22,6 +22,7 @@ _log = logging.getLogger(__name__)
 from .executor import Executor
 from .models import OrchestratorResult
 from .planner import Planner
+from .timing import TimingRun
 
 _SUMMARIZE_PROMPT = """\
 You are summarizing the results of a multi-step task execution for an \
@@ -66,7 +67,11 @@ class PlanExecuteRunner:
         self._planner = Planner(llm)
         self._executor = Executor(llm, server_paths)
 
-    async def run(self, question: str) -> OrchestratorResult:
+    async def run(
+        self,
+        question: str,
+        timer: TimingRun | None = None,
+    ) -> OrchestratorResult:
         """Run the full plan-execute loop for a question.
 
         Steps:
@@ -84,15 +89,27 @@ class PlanExecuteRunner:
         """
         # 1. Discover
         _log.info("Discovering agent capabilities...")
-        agent_descriptions = await self._executor.get_agent_descriptions()
+        if timer is None:
+            agent_descriptions = await self._executor.get_agent_descriptions()
+        else:
+            with timer.phase("discover"):
+                agent_descriptions = await self._executor.get_agent_descriptions()
 
         # 2. Plan
         _log.info("Planning...")
-        plan = self._planner.generate_plan(question, agent_descriptions)
+        if timer is None:
+            plan = self._planner.generate_plan(question, agent_descriptions)
+        else:
+            with timer.phase("plan"):
+                plan = self._planner.generate_plan(question, agent_descriptions)
         _log.info("Plan has %d step(s).", len(plan.steps))
 
         # 3. Execute
-        history = await self._executor.execute_plan(plan, question)
+        if timer is None:
+            history = await self._executor.execute_plan(plan, question)
+        else:
+            with timer.phase("execute"):
+                history = await self._executor.execute_plan(plan, question)
 
         # 4. Summarise
         _log.info("Summarising...")
@@ -101,9 +118,15 @@ class PlanExecuteRunner:
             + (r.response if r.success else f"ERROR: {r.error}")
             for r in history
         )
-        answer = self._llm.generate(
-            _SUMMARIZE_PROMPT.format(question=question, results=results_text)
-        )
+        if timer is None:
+            answer = self._llm.generate(
+                _SUMMARIZE_PROMPT.format(question=question, results=results_text)
+            )
+        else:
+            with timer.phase("summarise"):
+                answer = self._llm.generate(
+                    _SUMMARIZE_PROMPT.format(question=question, results=results_text)
+                )
 
         return OrchestratorResult(
             question=question,

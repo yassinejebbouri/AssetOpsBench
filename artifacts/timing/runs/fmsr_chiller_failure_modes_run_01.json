@@ -1,0 +1,21 @@
+{
+  "run_name": "fmsr_chiller_failure_modes_run_01",
+  "group": "fmsr_only",
+  "phases": {
+    "question_to_answer": {
+      "count": 1,
+      "total_seconds": 13.492398,
+      "average_seconds": 13.492398
+    }
+  },
+  "total_wall_time_seconds": 13.49285,
+  "metadata": {
+    "scenario_name": "fmsr_chiller_failure_modes",
+    "question_length_chars": 39,
+    "plan_steps": 2,
+    "tool_calls": 2,
+    "server_sequence": "FMSRAgent,FMSRAgent",
+    "unique_servers": "FMSRAgent"
+  },
+  "created_at_unix": 1775496012.895334
+}

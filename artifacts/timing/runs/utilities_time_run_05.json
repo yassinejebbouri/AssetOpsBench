@@ -1,0 +1,21 @@
+{
+  "run_name": "utilities_time_run_05",
+  "group": "utilities_only",
+  "phases": {
+    "question_to_answer": {
+      "count": 1,
+      "total_seconds": 3.81609,
+      "average_seconds": 3.81609
+    }
+  },
+  "total_wall_time_seconds": 3.816603,
+  "metadata": {
+    "scenario_name": "utilities_time",
+    "question_length_chars": 25,
+    "plan_steps": 1,
+    "tool_calls": 1,
+    "server_sequence": "Utilities",
+    "unique_servers": "Utilities"
+  },
+  "created_at_unix": 1775496107.4759
+}

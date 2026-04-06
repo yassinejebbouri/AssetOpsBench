@@ -1,0 +1,21 @@
+{
+  "run_name": "iot_observations_ch1_run_05",
+  "group": "iot_only",
+  "phases": {
+    "question_to_answer": {
+      "count": 1,
+      "total_seconds": 29.91934,
+      "average_seconds": 29.91934
+    }
+  },
+  "total_wall_time_seconds": 29.919652,
+  "metadata": {
+    "scenario_name": "iot_observations_ch1",
+    "question_length_chars": 41,
+    "plan_steps": 6,
+    "tool_calls": 5,
+    "server_sequence": "IoTAgent,IoTAgent,none,IoTAgent,Utilities,IoTAgent",
+    "unique_servers": "IoTAgent,Utilities,none"
+  },
+  "created_at_unix": 1775496313.687286
+}

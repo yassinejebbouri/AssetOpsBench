@@ -1,0 +1,21 @@
+{
+  "run_name": "iot_sensors_chiller_1_run_03",
+  "group": "iot_only",
+  "phases": {
+    "question_to_answer": {
+      "count": 1,
+      "total_seconds": 8.479029,
+      "average_seconds": 8.479029
+    }
+  },
+  "total_wall_time_seconds": 8.479517,
+  "metadata": {
+    "scenario_name": "iot_sensors_chiller_1",
+    "question_length_chars": 44,
+    "plan_steps": 3,
+    "tool_calls": 2,
+    "server_sequence": "IoTAgent,none,IoTAgent",
+    "unique_servers": "IoTAgent,none"
+  },
+  "created_at_unix": 1775495946.169792
+}

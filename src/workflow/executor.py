@@ -120,6 +120,17 @@ class Executor:
            them from prior step results.
         4. Call the tool and return its result.
         """
+
+        if not step.tool or step.tool.lower() in ("none", "null"):
+            return StepResult(
+                step_number=step.step_number,
+                task=step.task,
+                agent=step.agent,
+                response=step.expected_output,
+                tool=step.tool,
+                tool_args=step.tool_args,
+            )
+
         server_path = self._server_paths.get(step.agent)
         if server_path is None:
             return StepResult(
@@ -133,15 +144,7 @@ class Executor:
                 ),
             )
 
-        if not step.tool or step.tool.lower() in ("none", "null"):
-            return StepResult(
-                step_number=step.step_number,
-                task=step.task,
-                agent=step.agent,
-                response=step.expected_output,
-                tool=step.tool,
-                tool_args=step.tool_args,
-            )
+        
 
         try:
             if _has_placeholders(step.tool_args):
