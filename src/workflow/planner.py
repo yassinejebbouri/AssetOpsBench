@@ -15,6 +15,7 @@ from .models import Plan, PlanStep
 _PLAN_PROMPT = """\
 You are a planning assistant for industrial asset operations and maintenance.
 
+{topology}
 Decompose the question below into a sequence of subtasks. For each subtask,
 assign an agent and select the exact tool to call with its arguments.
 
@@ -42,6 +43,7 @@ Output format — one block per step, exactly:
 
 Rules:
 - Agent and tool names must exactly match those listed above.
+- Every #AgentN must be one of the agent names listed — never "none", "None", or empty.
 - #Args must be a valid JSON object on a single line.
 - Use {{step_N}} as a placeholder when an argument depends on step N's result.
 - Dependencies use #S<N> notation (e.g., #S1, #S2). Use "None" if none.
@@ -99,8 +101,13 @@ def parse_plan(raw: str) -> Plan:
 class Planner:
     """Decomposes a question into a structured execution plan using an LLM."""
 
-    def __init__(self, llm: LLMBackend) -> None:
+    def __init__(
+        self,
+        llm: LLMBackend,
+        topology_instructions: str = "",
+    ) -> None:
         self._llm = llm
+        self._topology = topology_instructions.strip()
 
     def generate_plan(
         self,
@@ -119,6 +126,13 @@ class Planner:
         agents_text = "\n\n".join(
             f"{name}:\n{desc}" for name, desc in agent_descriptions.items()
         )
-        prompt = _PLAN_PROMPT.format(agents=agents_text, question=question)
+        topo_block = (
+            self._topology + "\n\n" if self._topology else ""
+        )
+        prompt = _PLAN_PROMPT.format(
+            topology=topo_block,
+            agents=agents_text,
+            question=question,
+        )
         raw = self._llm.generate(prompt)
         return parse_plan(raw)

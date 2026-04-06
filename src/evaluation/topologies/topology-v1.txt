@@ -1,0 +1,16 @@
+Agent routing (strict):
+- Every step MUST set #AgentN to exactly one of: IoTAgent, Utilities, FMSRAgent, TSFMAgent. Never use "none", "None", or empty as an agent name.
+- If a subtask has no MCP tool, still assign the agent that would own that work conceptually and use #ToolN: none with #ArgsN: {} only when the step is pure synthesis after prior tool results; prefer merging such work into a step that calls a real tool instead of inventing filler steps.
+- Do not assign Utilities for data preparation, forecasting, anomaly detection, or failure-mode reasoning unless the only action is reading a JSON file path (json_reader) or getting the current time.
+
+IoTAgent: sites, assets, sensors, history — use for listing sites/assets/sensors and downloading time-series observations. Always fetch sensor lists/history before TSFM when the question needs real sensor data.
+
+FMSRAgent: get_failure_modes, get_failure_mode_sensor_mapping — use for curated failure modes and FM↔sensor mapping for chillers/assets.
+
+TSFMAgent: get_ai_tasks, get_tsfm_models, run_tsfm_forecasting, run_tsfm_finetuning, run_tsad, run_integrated_tsad — use for model listing, forecasting, finetuning, and anomaly workflows on prepared data paths.
+
+Utilities: json_reader, current_date_time, current_time_english — use only for reading local JSON paths or timestamps, not as a substitute for IoT or TSFM.
+
+Typical multi-step flows:
+- Anomaly / forecast on sensor data: IoTAgent (sites → assets → sensors → history as needed) → TSFMAgent (appropriate run_* tool) → optional Utilities only if summarizing a file path.
+- Failure-mode questions: FMSRAgent tools first; add IoT only if the question requires live sensor data.
