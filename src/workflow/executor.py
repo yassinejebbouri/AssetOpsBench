@@ -20,7 +20,8 @@ from pathlib import Path
 from typing import Any
 
 from llm import LLMBackend
-from .models import Plan, PlanStep, StepResult
+from .models import Plan, PlanStep, StepResult, HardwareMetrics
+from .profiler import HardwareProfiler
 
 _log = logging.getLogger(__name__)
 
@@ -120,6 +121,19 @@ class Executor:
            them from prior step results.
         4. Call the tool and return its result.
         """
+        # Check tool first: if the planner says no tool is needed the agent field
+        # is irrelevant (it may be "none" / empty) so we return before even
+        # trying to look up the server path.
+        if not step.tool or step.tool.lower() in ("none", "null"):
+            return StepResult(
+                step_number=step.step_number,
+                task=step.task,
+                agent=step.agent,
+                response=step.expected_output,
+                tool=step.tool,
+                tool_args=step.tool_args,
+            )
+
         server_path = self._server_paths.get(step.agent)
         if server_path is None:
             return StepResult(
@@ -131,16 +145,6 @@ class Executor:
                     f"Unknown agent '{step.agent}'. "
                     f"Registered agents: {list(self._server_paths)}"
                 ),
-            )
-
-        if not step.tool or step.tool.lower() in ("none", "null"):
-            return StepResult(
-                step_number=step.step_number,
-                task=step.task,
-                agent=step.agent,
-                response=step.expected_output,
-                tool=step.tool,
-                tool_args=step.tool_args,
             )
 
         try:
@@ -155,7 +159,14 @@ class Executor:
             else:
                 resolved_args = step.tool_args
 
-            response = await _call_tool(server_path, step.tool, resolved_args)
+            with HardwareProfiler(
+                server=step.agent,
+                tool=step.tool,
+                scenario_id=question[:60],
+                orchestration="mcp",
+            ) as prof:
+                response = await _call_tool(server_path, step.tool, resolved_args)
+
             return StepResult(
                 step_number=step.step_number,
                 task=step.task,
@@ -163,6 +174,14 @@ class Executor:
                 response=response,
                 tool=step.tool,
                 tool_args=resolved_args,
+                hardware=HardwareMetrics(
+                    wall_time_s=prof.wall_time_s,
+                    cpu_percent_peak=prof.cpu_percent_peak,
+                    ram_mb_start=prof.ram_mb_start,
+                    ram_mb_peak=prof.ram_mb_peak,
+                    ram_mb_end=prof.ram_mb_end,
+                    io_read_bytes=prof.io_read_bytes,
+                ),
             )
         except Exception as exc:  # noqa: BLE001
             return StepResult(

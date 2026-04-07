@@ -7,6 +7,28 @@ from typing import Optional
 
 
 @dataclass
+class HardwareMetrics:
+    """Hardware measurements captured during a single tool call."""
+
+    wall_time_s: float = 0.0        # total time the call took from start to finish
+    cpu_percent_peak: float = 0.0   # highest CPU burst recorded during the call
+    ram_mb_start: float = 0.0       # process RAM before the call
+    ram_mb_peak: float = 0.0        # maximum RAM usage during the call
+    ram_mb_end: float = 0.0         # process RAM after the call
+    io_read_bytes: int = 0          # bytes read from disk during the call
+
+    def to_dict(self) -> dict:
+        return {
+            "wall_time_s": self.wall_time_s,
+            "cpu_percent_peak": self.cpu_percent_peak,
+            "ram_mb_start": self.ram_mb_start,
+            "ram_mb_peak": self.ram_mb_peak,
+            "ram_mb_end": self.ram_mb_end,
+            "io_read_bytes": self.io_read_bytes,
+        }
+
+
+@dataclass
 class PlanStep:
     """A single step in an execution plan."""
 
@@ -61,6 +83,7 @@ class StepResult:
     error: Optional[str] = None
     tool: str = ""
     tool_args: dict = field(default_factory=dict)
+    hardware: Optional[HardwareMetrics] = None  # hardware metrics for this tool call
 
     @property
     def success(self) -> bool:

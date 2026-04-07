@@ -15,8 +15,15 @@ Credentials are resolved from environment variables based on the prefix:
 from __future__ import annotations
 
 import os
+import time
 
 from .base import LLMBackend
+
+# minimum gap between consecutive API calls to avoid burst rate limits
+MIN_CALL_INTERVAL = 1.5  # seconds
+
+# how many times to retry before giving up on a rate limit error
+MAX_RETRIES = 5
 
 
 class LiteLLMBackend(LLMBackend):
@@ -30,9 +37,15 @@ class LiteLLMBackend(LLMBackend):
 
     def __init__(self, model_id: str) -> None:
         self._model_id = model_id
+        self._last_call_time = 0.0  # timestamp of the last API call
 
     def generate(self, prompt: str, temperature: float = 0.0) -> str:
         import litellm
+
+        # wait if the last call was too recent
+        elapsed = time.time() - self._last_call_time
+        if elapsed < MIN_CALL_INTERVAL:
+            time.sleep(MIN_CALL_INTERVAL - elapsed)
 
         kwargs: dict = {
             "model": self._model_id,
@@ -50,5 +63,14 @@ class LiteLLMBackend(LLMBackend):
             kwargs["api_key"] = os.environ["LITELLM_API_KEY"]
             kwargs["api_base"] = os.environ["LITELLM_BASE_URL"]
 
-        response = litellm.completion(**kwargs)
-        return response.choices[0].message.content
+        # retry with exponential backoff on rate limit errors (2s, 4s, 8s, 16s, 32s)
+        for attempt in range(MAX_RETRIES):
+            try:
+                self._last_call_time = time.time()
+                response = litellm.completion(**kwargs)
+                return response.choices[0].message.content
+            except litellm.RateLimitError:
+                if attempt == MAX_RETRIES - 1:
+                    raise
+                wait = 2.0 * (2 ** attempt)
+                time.sleep(wait)
