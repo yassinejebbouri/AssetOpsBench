@@ -15,9 +15,11 @@ supported by litellm works — the provider is encoded in the prefix.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
+import time
 from pathlib import Path
 from typing import Dict, List, Union
 
@@ -88,6 +90,7 @@ def _parse_relevancy(text: str) -> dict:
 
 _DEFAULT_MODEL_ID = "watsonx/meta-llama/llama-3-3-70b-instruct"
 _MAX_RETRIES = 3
+_CONCURRENCY = int(os.environ.get("FMSR_CONCURRENCY", "8"))
 
 
 def _build_llm():
@@ -129,16 +132,19 @@ def _call_asset2fm(asset_name: str) -> list[str]:
 
 
 def _call_relevancy(asset_name: str, failure_mode: str, sensor: str) -> dict:
-    """Query the LLM for FM↔sensor relevancy. Retries up to _MAX_RETRIES times."""
+    """Query the LLM for FM↔sensor relevancy. Retries up to _MAX_RETRIES times with exponential backoff."""
     prompt = _RELEVANCY_PROMPT.format(
         asset_name=asset_name, failure_mode=failure_mode, sensor=sensor
     )
     last_exc: Exception | None = None
-    for _ in range(_MAX_RETRIES):
+    for attempt in range(_MAX_RETRIES):
         try:
             return _parse_relevancy(_llm.generate(prompt))
         except Exception as exc:
             last_exc = exc
+            # Exponential backoff: 0.5s, 1s, 2s — important for WatsonX 429 rate limits
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(0.5 * (2 ** attempt))
     raise last_exc
 
 
@@ -206,7 +212,7 @@ def get_failure_modes(asset_name: str) -> Union[FailureModesResult, ErrorResult]
 
 
 @mcp.tool()
-def get_failure_mode_sensor_mapping(
+async def get_failure_mode_sensor_mapping(
     asset_name: str,
     failure_modes: List[str],
     sensors: List[str],
@@ -215,10 +221,9 @@ def get_failure_mode_sensor_mapping(
     the failure. Returns a bidirectional mapping (fm→sensors, sensor→fms) plus
     the full per-pair relevancy details.
 
-    Note: one LLM call is made per (failure_mode, sensor) pair sequentially.
-    Keep both lists small (e.g. ≤5 failure modes, ≤10 sensors) to avoid long
-    runtimes. For a chiller with 7 failure modes and 20+ sensors the call will
-    take several minutes."""
+    All N×M pairs are evaluated concurrently (up to FMSR_CONCURRENCY=8 at a time)
+    using asyncio.gather + asyncio.to_thread, reducing wall-clock time from O(N×M)
+    serial to O(N×M / concurrency) parallel."""
     if not asset_name:
         return ErrorResult(error="asset_name is required")
     if not failure_modes:
@@ -228,29 +233,35 @@ def get_failure_mode_sensor_mapping(
     if not _llm_available:
         return ErrorResult(error="LLM unavailable")
 
-    full_relevancy: List[RelevancyEntry] = []
-    fm2sensor: Dict[str, List[str]] = {}
-    sensor2fm: Dict[str, List[str]] = {}
+    semaphore = asyncio.Semaphore(_CONCURRENCY)
+    pairs = [(s, fm) for s in sensors for fm in failure_modes]
+
+    async def _one_pair(s: str, fm: str) -> RelevancyEntry:
+        async with semaphore:
+            gen = await asyncio.to_thread(_call_relevancy, asset_name, fm, s)
+        return RelevancyEntry(
+            asset_name=asset_name,
+            failure_mode=fm,
+            sensor=s,
+            relevancy_answer=gen["answer"],
+            relevancy_reason=gen["reason"],
+            temporal_behavior=gen["temporal_behavior"],
+        )
 
     try:
-        for s in sensors:
-            for fm in failure_modes:
-                gen = _call_relevancy(asset_name, fm, s)
-                entry = RelevancyEntry(
-                    asset_name=asset_name,
-                    failure_mode=fm,
-                    sensor=s,
-                    relevancy_answer=gen["answer"],
-                    relevancy_reason=gen["reason"],
-                    temporal_behavior=gen["temporal_behavior"],
-                )
-                full_relevancy.append(entry)
-                if "yes" in gen["answer"].lower():
-                    fm2sensor.setdefault(fm, []).append(s)
-                    sensor2fm.setdefault(s, []).append(fm)
+        entries: List[RelevancyEntry] = await asyncio.gather(
+            *[_one_pair(s, fm) for s, fm in pairs]
+        )
     except Exception as exc:
         logger.error("_call_relevancy failed: %s", exc)
         return ErrorResult(error=str(exc))
+
+    fm2sensor: Dict[str, List[str]] = {}
+    sensor2fm: Dict[str, List[str]] = {}
+    for entry in entries:
+        if "yes" in entry.relevancy_answer.lower():
+            fm2sensor.setdefault(entry.failure_mode, []).append(entry.sensor)
+            sensor2fm.setdefault(entry.sensor, []).append(entry.failure_mode)
 
     return FailureModeSensorMappingResult(
         metadata=MappingMetadata(
@@ -260,7 +271,7 @@ def get_failure_mode_sensor_mapping(
         ),
         fm2sensor=fm2sensor,
         sensor2fm=sensor2fm,
-        full_relevancy=full_relevancy,
+        full_relevancy=list(entries),
     )
 
 

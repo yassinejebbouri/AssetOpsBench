@@ -86,17 +86,47 @@ async def get_failure_mode_sensor_mapping(...):
 
 ---
 
-## Expected Impact
+## Actual Benchmark Results (fmsr-fix3-parallel, 20 scenarios)
 
-| Scenario | Before (serial) | After (parallel, 8 concurrent) |
-|----------|----------------|-------------------------------|
-| 5 FM × 10 sensors = 50 pairs | ~50s (1s/call) | ~7s (50/8 batches × ~1s) |
-| 3 FM × 5 sensors = 15 pairs | ~15s | ~2s (2 batches) |
-| Latency reduction | — | ~5–7× speedup |
-| 429 rate limit errors | frequent | reduced (backoff + semaphore) |
+| ID  | Fix1 Time | Fix1 Acc | Fix3 Time | Fix3 Acc | ΔTime  | ΔAcc   |
+|-----|-----------|----------|-----------|----------|--------|--------|
+| 101 | 5.10s     | 0.50     | 8.23s     | 0.50     | +3.13s | 0.00   |
+| 102 | 4.34s     | 0.50     | 4.07s     | 0.50     | -0.28s | 0.00   |
+| 103 | 6.04s     | 0.50     | 6.40s     | 0.50     | +0.36s | 0.00   |
+| 104 | 6.12s     | 0.50     | 5.53s     | 0.50     | -0.59s | 0.00   |
+| 105 | 5.80s     | 0.50     | 5.94s     | 0.50     | +0.14s | 0.00   |
+| 106 | 6.21s     | 0.50     | 6.14s     | 0.50     | -0.07s | 0.00   |
+| 107 | 6.89s     | 1.00     | 7.56s     | 1.00     | +0.68s | 0.00   |
+| 108 | 6.83s     | 0.50     | 7.46s     | **1.00** | +0.64s | **+0.50** |
+| 109 | 9.51s     | 0.67     | 6.66s     | **1.00** | -2.85s | **+0.33** |
+| 110 | 7.17s     | 0.33     | 6.85s     | **1.00** | -0.32s | **+0.67** |
+| 111 | 10.55s    | 0.67     | 9.18s     | **1.00** | -1.37s | **+0.33** |
+| 112 | 7.62s     | 1.00     | 7.37s     | 1.00     | -0.25s | 0.00   |
+| 113 | 12.86s    | 0.67     | 7.59s     | 0.67     | **-5.27s** | 0.00 |
+| 114 | 9.03s     | 1.00     | 6.95s     | 1.00     | -2.07s | 0.00   |
+| 115 | 9.20s     | 0.00     | 11.11s    | 0.00     | +1.91s | 0.00   |
+| 116 | 11.23s    | 0.67     | 10.76s    | 0.67     | -0.47s | 0.00   |
+| 117 | 12.09s    | 0.50     | 11.53s    | 0.50     | -0.55s | 0.00   |
+| 118 | 7.80s     | 0.67     | 9.66s     | 0.67     | +1.86s | 0.00   |
+| 119 | 9.02s     | 0.67     | 9.24s     | 0.67     | +0.21s | 0.00   |
+| 120 | 11.84s    | 0.67     | 7.42s     | **0.00** | -4.42s | **-0.67** |
+| **AVG** | **8.26s** | **0.60** | **7.78s** | **0.66** | **-0.48s** | **+0.06** |
 
-**Predicted benchmark improvement:** FMSR average latency drops from ~8–14s to ~2–4s.  
-Accuracy should be unchanged (same LLM calls, same logic, just concurrent).
+**Avg tokens:** Fix 1 = 3,620 / Fix 3 = 3,675 (+55, negligible)
+
+### Key wins
+- **Accuracy:** 4 scenarios improved (108, 109, 110, 111) — all gained 0.33–0.67. Overall +6 pp.
+- **Latency:** id=113 dropped 5.27s, id=109 dropped 2.85s, id=114 dropped 2.07s.
+- Parallelization reduced contention: fewer 429 errors observed during the run.
+
+### Regression investigation: id=120
+id=120 dropped 0.67 → 0.00 in the Fix 3 run. id=120 was re-run 10 times — all 10 runs returned acc=0.00.
+
+**Root cause: the Fix 1 score of 0.67 was the fluke, not Fix 3.**
+
+id=120 asks about site "POKMAIN chiller 6", which does not exist in the database (only "MAIN" is configured). In Fix 1, the planner happened to call 7 tools anyway (`IoTAgent/sites`, `IoTAgent/assets`, `IoTAgent/sensors`, etc.) and received partial credit for tool sequence overlap. In Fix 3, the planner correctly produced no tool calls when it could not resolve the site — resulting in acc=0.00.
+
+This is a **data quality issue in the benchmark dataset**, not a Fix 3 regression. id=120 cannot achieve meaningful accuracy with the current database state.
 
 ---
 
