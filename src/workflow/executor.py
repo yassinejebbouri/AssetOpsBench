@@ -146,12 +146,10 @@ class Executor:
         try:
             if _has_placeholders(step.tool_args):
                 _log.info(
-                    "Step %d has unresolved args — calling LLM to resolve.",
+                    "Step %d has unresolved args — resolving directly from context.",
                     step.step_number,
                 )
-                resolved_args = await _resolve_args_with_llm(
-                    step.task, step.tool, step.tool_args, context, self._llm
-                )
+                resolved_args = _resolve_args(step.tool_args, context)
             else:
                 resolved_args = step.tool_args
 

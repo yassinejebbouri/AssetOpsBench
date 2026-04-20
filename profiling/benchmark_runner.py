@@ -283,10 +283,12 @@ class BenchmarkRunner:
 
     def _save_json(self, record: SingleRunRecord) -> None:
         """Write a per-run JSON file to RESULTS_DIR."""
+        run_tag = f"_{self._cfg.wandb_run_name}" if self._cfg.wandb_run_name else ""
         filename = (
             f"{record.metrics.orchestrator_type.lower()}_"
             f"{record.scenario.scenario_id}_"
-            f"{record.scenario.domain}.json"
+            f"{record.scenario.domain}"
+            f"{run_tag}.json"
         )
         path = RESULTS_DIR / filename
         payload: dict[str, Any] = {
