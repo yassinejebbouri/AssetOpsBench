@@ -122,7 +122,7 @@ async def test_orchestrator_unknown_agent_recorded_as_error(sequential_llm):
 
 @pytest.mark.anyio
 async def test_orchestrator_no_tool_returns_expected_output(sequential_llm):
-    """A step with tool=none returns expected_output directly (no MCP call)."""
+    """A step with tool=none and no dependencies returns expected_output (no MCP call)."""
     plan_with_no_tool = (
         "#Task1: Answer from context\n"
         "#Agent1: IoTAgent\n"

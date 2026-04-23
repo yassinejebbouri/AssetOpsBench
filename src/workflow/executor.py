@@ -6,7 +6,7 @@ be determined after a prior step runs.  When placeholders are detected the
 executor makes a targeted LLM call to resolve the concrete values from the
 prior step's result, then calls the tool.
 
-LLM call budget per question:
+LLM call budget per question (approximate):
   - Independent steps (no placeholders): 0 extra LLM calls — tool called directly.
   - Dependent steps (has {{step_N}}):     1 LLM call to resolve args, then call tool.
 """
@@ -37,7 +37,8 @@ DEFAULT_SERVER_PATHS: dict[str, Path | str] = {
     "TSFMAgent": "tsfm-mcp-server",
 }
 
-_PLACEHOLDER_RE = re.compile(r"\{step_(\d+)\}")
+# Match {step_1}, {step_1[0]}, etc. (LLMs often emit index hints like [0] for "first item".)
+_PLACEHOLDER_RE = re.compile(r"\{step_(\d+)(?:\[[^\]]*\])?\}")
 
 _ARG_RESOLUTION_PROMPT = """\
 You are resolving tool argument values for one step in a multi-step plan.
@@ -51,10 +52,21 @@ Results from prior steps:
 The following arguments need their values resolved from the context above:
 {unresolved}
 
-Respond with a JSON object containing ONLY the resolved argument values.
+Respond with a JSON object containing ONLY the resolved argument for the unresolved parameters values for the tool call.
 Example: {{"site_name": "MAIN", "asset_id": "CH-1"}}
 
 Response:"""
+
+CONTEXT_AGENT_NAME = "ContextAgent"
+
+_NO_TOOL_LLM_PROMPT = """Context:
+{context}
+
+Task: {task}
+Question: {question}
+
+Reply with one line only — the answer value (no sentences, no quotes around the whole reply).
+"""
 
 
 class Executor:
@@ -115,18 +127,25 @@ class Executor:
         """Execute a single plan step.
 
         1. Resolve the MCP server assigned to this step.
-        2. If no tool is specified, return expected_output directly.
+        2. If no tool is specified, parse prior JSON when possible; else one-line LLM.
         3. If tool_args contain {{step_N}} placeholders, call the LLM to resolve
            them from prior step results.
         4. Call the tool and return its result.
         """
 
         if not step.tool or step.tool.lower() in ("none", "null"):
+            response = _answer_no_tool_step(
+                task=step.task,
+                question=question,
+                context=context,
+                dependency_steps=step.dependencies,
+                llm=self._llm,
+            )
             return StepResult(
                 step_number=step.step_number,
                 task=step.task,
-                agent=step.agent,
-                response=step.expected_output,
+                agent=CONTEXT_AGENT_NAME,
+                response=response,
                 tool=step.tool,
                 tool_args=step.tool_args,
             )
@@ -144,8 +163,6 @@ class Executor:
                 ),
             )
 
-        
-
         try:
             if _has_placeholders(step.tool_args):
                 _log.info(
@@ -159,6 +176,7 @@ class Executor:
                 resolved_args = step.tool_args
 
             response = await _call_tool(server_path, step.tool, resolved_args)
+            print(f"Response for step {step.step_number}: {response}")
             return StepResult(
                 step_number=step.step_number,
                 task=step.task,
@@ -266,6 +284,83 @@ def _parse_json(raw: str) -> dict:
     return {}
 
 
+def _first_answer_line(text: str) -> str:
+    line = text.strip().splitlines()[0] if text.strip() else ""
+    return line.strip().strip('"').strip("'")
+
+
+def _parse_json_object(raw: str) -> dict | None:
+    data = _parse_json(raw)
+    return data if data else None
+
+
+def _asset_ids_from_payload(data: dict) -> list[str]:
+    assets = data.get("assets")
+    if not isinstance(assets, list):
+        return []
+    ids: list[str] = []
+    for x in assets:
+        if isinstance(x, str) and x:
+            ids.append(x)
+        elif isinstance(x, dict):
+            for key in ("id", "name", "asset_id"):
+                v = x.get(key)
+                if isinstance(v, str) and v:
+                    ids.append(v)
+                    break
+    return ids
+
+
+def _try_answer_from_assets_json(
+    task: str,
+    question: str,
+    context: dict[int, StepResult],
+    dependency_steps: list[int],
+) -> str | None:
+    """If a dependency step is assets JSON, pick the asset id string without an LLM."""
+    haystack = f"{task} {question}"
+    for n in sorted(dependency_steps, reverse=True):
+        if n not in context:
+            continue
+        data = _parse_json_object(context[n].response)
+        if not data:
+            continue
+        ids = _asset_ids_from_payload(data)
+        if not ids:
+            continue
+        if len(ids) == 1:
+            return ids[0]
+        for aid in ids:
+            if aid in haystack:
+                return aid
+    return None
+
+
+def _format_dep_context(context: dict[int, StepResult], dependency_steps: list[int]) -> str:
+    lines = [
+        f"Step {n}: {context[n].response}"
+        for n in sorted(dependency_steps)
+        if n in context
+    ]
+    return "\n".join(lines) if lines else "(no prior steps)"
+
+
+def _answer_no_tool_step(
+    task: str,
+    question: str,
+    context: dict[int, StepResult],
+    dependency_steps: list[int],
+    llm: LLMBackend,
+) -> str:
+    """Resolve tool-less steps: prefer parsing IoT ``assets`` JSON, else minimal LLM."""
+    hit = _try_answer_from_assets_json(task, question, context, dependency_steps)
+    if hit is not None:
+        return hit
+    block = _format_dep_context(context, dependency_steps)
+    prompt = _NO_TOOL_LLM_PROMPT.format(context=block, task=task, question=question)
+    return _first_answer_line(llm.generate(prompt))
+
+
 # ── MCP protocol helpers ──────────────────────────────────────────────────────
 
 
@@ -337,6 +432,7 @@ async def _call_tool(server_path: Path | str, tool_name: str, args: dict) -> str
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.call_tool(tool_name, args)
+            print(f"Result for tool {tool_name} with args {args}: {result}")
             return _extract_content(result.content)
 
 

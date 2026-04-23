@@ -46,6 +46,8 @@ Rules:
 - Use {{step_N}} as a placeholder when an argument depends on step N's result.
 - Dependencies use #S<N> notation (e.g., #S1, #S2). Use "None" if none.
 - Keep tasks specific and actionable.
+- For Tool "none" steps that list dependencies, #ExpectedOutput describes the artifact
+  to derive; the runtime extracts concrete values from prior results (not literal text).
 
 Question: {question}
 

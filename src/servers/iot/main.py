@@ -114,16 +114,22 @@ def get_sensor_list(asset_id: str) -> List[str]:
 @mcp.tool()
 def sites() -> SitesResult:
     """Retrieves a list of sites. Each site is represented by a name."""
-    return SitesResult(sites=SITES)
+    temp = SitesResult(sites=SITES)
+    logger.info(f"Sites result: {temp}")
+    return temp
 
 
 @mcp.tool()
 def assets(site_name: str) -> Union[AssetsResult, ErrorResult]:
     """Returns a list of assets for a given site. Each asset includes an id and a name."""
     if site_name not in SITES:
+        logger.error(f"Unknown site requested: {site_name}")
         return ErrorResult(error=f"unknown site {site_name}")
 
+    logger.info(f"Assets called with site_name: {site_name}")
+
     asset_list = get_asset_list()
+    logger.info(f"Assets found for site {site_name}: {asset_list}")
     return AssetsResult(
         site_name=site_name,
         total_assets=len(asset_list),
@@ -135,13 +141,14 @@ def assets(site_name: str) -> Union[AssetsResult, ErrorResult]:
 @mcp.tool()
 def sensors(site_name: str, asset_id: str) -> Union[SensorsResult, ErrorResult]:
     """Lists the sensors available for a specified asset at a given site."""
+    logger.info(f"Sensors called with site_name: {site_name}, asset_id: {asset_id}")
     if site_name not in SITES:
+        logger.error(f"Unknown site requested: {site_name}")
         return ErrorResult(error=f"unknown site {site_name}")
-
     sensor_list = get_sensor_list(asset_id)
     if not sensor_list:
+        logger.error(f"Unknown asset ID requested: {asset_id}")
         return ErrorResult(error=f"unknown asset_id {asset_id} or no sensors found")
-
     return SensorsResult(
         site_name=site_name,
         asset_id=asset_id,
