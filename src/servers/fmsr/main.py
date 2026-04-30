@@ -145,6 +145,16 @@ def _call_relevancy(asset_name: str, failure_mode: str, sensor: str) -> dict:
 # Set to ~2× the normal per-call latency (normal calls take 2–4 s).
 _HEDGE_AFTER_S: float = float(os.environ.get("FMSR_HEDGE_AFTER_S", "8"))
 
+# Parallelization strategy for get_failure_mode_sensor_mapping.
+# Controlled via FMSR_STRATEGY env var so the benchmark can select the strategy
+# by passing the var to the server subprocess — no code changes needed per run.
+#   sequential      — one LLM call at a time (baseline)
+#   parallel        — fixed thread pool, FMSR_PARALLEL_WORKERS workers
+#   adaptive_ceiling — ceiling-start, halve on error
+#   hedged          — ceiling-start + speculative duplicate on stall
+_STRATEGY = os.environ.get("FMSR_STRATEGY", "parallel")
+_PARALLEL_WORKERS = int(os.environ.get("FMSR_PARALLEL_WORKERS", "2"))
+
 
 def _call_relevancy_hedged(asset_name: str, failure_mode: str, sensor: str) -> dict:
     """FM↔sensor relevancy call with speculative hedging.
@@ -810,40 +820,46 @@ def get_failure_mode_sensor_mapping(
     fm2sensor: Dict[str, List[str]] = {}
     sensor2fm: Dict[str, List[str]] = {}
 
-    pairs = [(s, fm) for s in sensors for fm in failure_modes]
-
     try:
-        # Submit all N×M calls to a thread pool at once (prefetch).
-        # Each pair gets its own thread so HTTP requests to the LLM
-        # run concurrently instead of one at a time.
-        with ThreadPoolExecutor(max_workers=min(2, len(pairs))) as pool:
-            future_to_pair = {
-                pool.submit(_call_relevancy, asset_name, fm, s): (s, fm)
-                for s, fm in pairs
-            }
-            raw: Dict[tuple, dict] = {}
-            for future in as_completed(future_to_pair):
-                raw[future_to_pair[future]] = future.result()
+        # Dispatch all N×M relevancy calls using the configured strategy.
+        # Strategy is set via FMSR_STRATEGY env var so the benchmark can
+        # select it by passing the var when spawning this server subprocess.
+        if _STRATEGY == "sequential":
+            raw_results = _mapping_sequential(asset_name, failure_modes, sensors)
+        elif _STRATEGY == "parallel":
+            raw_results = _mapping_parallel(asset_name, failure_modes, sensors,
+                                            max_workers=_PARALLEL_WORKERS)
+        elif _STRATEGY == "adaptive_ceiling":
+            raw_results = _mapping_adaptive_ceiling(asset_name, failure_modes, sensors,
+                                                    max_concurrency=0, min_concurrency=1)
+        elif _STRATEGY == "hedged":
+            raw_results = _mapping_hedged(asset_name, failure_modes, sensors,
+                                          max_concurrency=0)
+        else:
+            logger.warning("Unknown FMSR_STRATEGY %r — falling back to parallel", _STRATEGY)
+            raw_results = _mapping_parallel(asset_name, failure_modes, sensors,
+                                            max_workers=_PARALLEL_WORKERS)
 
-        # Reassemble in original (sensor, fm) order for deterministic output.
-        for s in sensors:
-            for fm in failure_modes:
-                gen = raw[(s, fm)]
-                entry = RelevancyEntry(
-                    asset_name=asset_name,
-                    failure_mode=fm,
-                    sensor=s,
-                    relevancy_answer=gen["answer"],
-                    relevancy_reason=gen["reason"],
-                    temporal_behavior=gen["temporal_behavior"],
-                )
-                full_relevancy.append(entry)
-                if "yes" in gen["answer"].lower():
-                    fm2sensor.setdefault(fm, []).append(s)
-                    sensor2fm.setdefault(s, []).append(fm)
+        # raw_results is a list of {sensor, failure_mode, answer, reason, temporal_behavior}
+        for entry_dict in raw_results:
+            s   = entry_dict["sensor"]
+            fm  = entry_dict["failure_mode"]
+            gen = entry_dict
+            entry = RelevancyEntry(
+                asset_name=asset_name,
+                failure_mode=fm,
+                sensor=s,
+                relevancy_answer=gen["answer"],
+                relevancy_reason=gen["reason"],
+                temporal_behavior=gen["temporal_behavior"],
+            )
+            full_relevancy.append(entry)
+            if "yes" in gen["answer"].lower():
+                fm2sensor.setdefault(fm, []).append(s)
+                sensor2fm.setdefault(s, []).append(fm)
 
     except Exception as exc:
-        logger.error("_call_relevancy failed: %s", exc)
+        logger.error("mapping failed (strategy=%s): %s", _STRATEGY, exc)
         return ErrorResult(error=str(exc))
 
     return FailureModeSensorMappingResult(
