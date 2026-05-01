@@ -20,7 +20,7 @@ assign an agent and select the exact tool to call with its arguments.
 
 Available agents and tools:
 {agents}
-
+{context_block}
 For argument values that can only be known from a prior step's result,
 use the placeholder {{step_N}} (e.g., {{step_1}}) as the value.
 
@@ -50,6 +50,17 @@ Rules:
 Question: {question}
 
 Plan:
+"""
+
+# Injected when prefetch=True. Tells the planner to use real values directly
+# instead of generating discovery steps for data we already have.
+_CONTEXT_BLOCK_TEMPLATE = """\
+
+Database context — real values fetched live from the system.
+Use these exact values as tool arguments. Do NOT generate discovery steps
+(sites, assets, sensors, failure modes) for data already listed here.
+
+{context}
 """
 
 _TASK_RE = re.compile(r"#Task(\d+):\s*(.+)")
@@ -106,12 +117,16 @@ class Planner:
         self,
         question: str,
         agent_descriptions: dict[str, str],
+        context: str | None = None,
     ) -> Plan:
         """Generate a plan for a question given available agents and their tools.
 
         Args:
             question: The user question to answer.
             agent_descriptions: Mapping of agent_name -> formatted tool signatures.
+            context: Optional pre-fetched database context string. When provided,
+                     it is injected into the prompt so the planner can write
+                     concrete argument values instead of discovery steps.
 
         Returns:
             A Plan where each PlanStep includes the tool to call and its arguments.
@@ -119,6 +134,15 @@ class Planner:
         agents_text = "\n\n".join(
             f"{name}:\n{desc}" for name, desc in agent_descriptions.items()
         )
-        prompt = _PLAN_PROMPT.format(agents=agents_text, question=question)
+        context_block = (
+            _CONTEXT_BLOCK_TEMPLATE.format(context=context)
+            if context
+            else ""
+        )
+        prompt = _PLAN_PROMPT.format(
+            agents=agents_text,
+            context_block=context_block,
+            question=question,
+        )
         raw = self._llm.generate(prompt)
         return parse_plan(raw)
