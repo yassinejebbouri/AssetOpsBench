@@ -15,15 +15,29 @@ Credentials are resolved from environment variables based on the prefix:
 from __future__ import annotations
 
 import os
+import socket
+import sys
 import time
 
 from .base import LLMBackend
+
+# Force any plain socket.socket() created during this process to time out.
+# WatsonX's provider inside litellm uses ibm-watsonx-ai which builds its own
+# urllib3 HTTP client and ignores the litellm `timeout` kwarg, so without this
+# a hung TCP recv() keeps the whole run blocked forever.
+_SOCKET_TIMEOUT_S = 60.0
+socket.setdefaulttimeout(_SOCKET_TIMEOUT_S)
 
 # minimum gap between consecutive API calls to avoid burst rate limits
 MIN_CALL_INTERVAL = 1.5  # seconds
 
 # how many times to retry before giving up on a rate limit error
 MAX_RETRIES = 5
+
+# per-call network timeout -- WatsonX has been observed to leave TCP sockets
+# half-open, which causes urllib3 to block forever in recv() with no signal.
+# A finite timeout turns that into a retryable exception.
+REQUEST_TIMEOUT_S = 60.0
 
 
 class LiteLLMBackend(LLMBackend):
@@ -52,6 +66,7 @@ class LiteLLMBackend(LLMBackend):
             "messages": [{"role": "user", "content": prompt}],
             "temperature": temperature,
             "max_tokens": 2048,
+            "timeout": REQUEST_TIMEOUT_S,
         }
 
         if self._model_id.startswith("watsonx/"):
@@ -63,14 +78,42 @@ class LiteLLMBackend(LLMBackend):
             kwargs["api_key"] = os.environ["LITELLM_API_KEY"]
             kwargs["api_base"] = os.environ["LITELLM_BASE_URL"]
 
-        # retry with exponential backoff on rate limit errors (2s, 4s, 8s, 16s, 32s)
+        # retry with exponential backoff on rate limit / timeout / connection
+        # errors (2s, 4s, 8s, 16s, 32s). TimeoutError covers
+        # socket.setdefaulttimeout() firing inside ibm-watsonx-ai's urllib3
+        # client. InternalServerError is deliberately NOT retryable -- WatsonX
+        # returns persistent 500s for certain prompts and retrying just delays
+        # the inevitable error record by minutes.
+        retryable = (
+            litellm.RateLimitError,
+            litellm.Timeout,
+            TimeoutError,
+            ConnectionError,
+        )
         for attempt in range(MAX_RETRIES):
             try:
                 self._last_call_time = time.time()
                 response = litellm.completion(**kwargs)
                 return response.choices[0].message.content
-            except litellm.RateLimitError:
+            except retryable as exc:
                 if attempt == MAX_RETRIES - 1:
+                    print(
+                        f"[LLM] giving up after {MAX_RETRIES} retries: "
+                        f"{type(exc).__name__}: {str(exc)[:200]}",
+                        file=sys.stderr, flush=True,
+                    )
                     raise
                 wait = 2.0 * (2 ** attempt)
+                print(
+                    f"[LLM] {type(exc).__name__} (attempt {attempt+1}/{MAX_RETRIES}), "
+                    f"sleeping {wait:.0f}s: {str(exc)[:120]}",
+                    file=sys.stderr, flush=True,
+                )
                 time.sleep(wait)
+            except Exception as exc:
+                # surface non-retryable errors so we can see what's happening
+                print(
+                    f"[LLM] non-retryable {type(exc).__name__}: {str(exc)[:300]}",
+                    file=sys.stderr, flush=True,
+                )
+                raise

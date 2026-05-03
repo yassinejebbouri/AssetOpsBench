@@ -1,27 +1,21 @@
-"""MCP pipeline benchmark -- full AssetOpsBench scenario suite.
+"""Direct-agent benchmark — non-MCP baseline for the plan-execute workflow.
 
-Loads all 139 scenarios from the benchmark JSON files and runs them through
-the plan-execute MCP pipeline. Each scenario result is saved immediately to
-a JSONL file so partial runs are never lost.
+Mirrors ``run_mcp.py`` but swaps the MCP Executor for the DirectExecutor,
+which calls server Python functions in-process instead of going through
+MCP stdio. The planner, argument resolution, and summariser are identical
+to the MCP run, so the wall-time delta between this script and ``run_mcp.py``
+isolates the cost of the MCP protocol itself.
 
-Scenario files loaded:
-  single_agent/iot_utterance_meta.json   (IoT, IDs 1-48)
-  single_agent/fmsr_utterance.json       (FMSR, IDs 101-120)
-  single_agent/tsfm_utterance.json       (TSFM, IDs 201-223)
-  single_agent/wo_utterance.json         (WO, IDs 400-435)  -- skipped, server not built
-  multi_agent/end2end_utterance.json     (multi-agent, IDs 501-620)
-
-Status flags recorded per scenario run:
+Status flags match ``run_mcp.py``:
   success    -- all steps completed without errors
   partial    -- some steps succeeded but at least one failed
   failed     -- every step failed or the runner raised an exception
-  no_agent   -- at least one step hit "Unknown agent" (server not registered)
+  no_agent   -- at least one step hit "Unknown agent" (not registered in DirectExecutor)
   error      -- exception thrown before any steps ran (e.g. LLM/network failure)
 
 Run from the repo root:
-    uv run python src/benchmarking/run_mcp.py
-    uv run python src/benchmarking/run_mcp.py --runs 2 --warmup 0
-    uv run python src/benchmarking/run_mcp.py --include-wo   # attempt WO scenarios too
+    uv run python src/benchmarking/run_direct_agent.py --categories fmsr
+    uv run python src/benchmarking/run_direct_agent.py --categories fmsr --runs 2 --warmup 0
 """
 
 from __future__ import annotations
@@ -42,35 +36,31 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import wandb
 
 from llm import LiteLLMBackend
+from workflow.direct_executor import DirectExecutor, _build_tool_registry
 from workflow.runner import PlanExecuteRunner
 
-# model used by teammates -- kept consistent across all benchmark runs
+# same model as run_mcp.py -- keeps planner/summariser calls directly comparable
 MODEL_ID = os.environ.get("BENCHMARK_MODEL_ID", "watsonx/meta-llama/llama-3-2-90b-vision-instruct")
 
-N_RUNS = 3   # total runs per scenario (first WARMUP are discarded)
-WARMUP = 1   # warmup run to let MCP subprocesses and LLM client settle
+N_RUNS = 3
+WARMUP = 1
 
-# delay between scenario runs -- WatsonX has per-minute token limits
-BETWEEN_RUNS_DELAY = 3.0    # seconds between each run of the same scenario
-BETWEEN_SCENARIOS_DELAY = 5.0  # seconds between different scenarios
+# direct has no subprocess startup cost, but shares the same LLM rate limits as MCP
+BETWEEN_RUNS_DELAY = 3.0
+BETWEEN_SCENARIOS_DELAY = 5.0
 
 _SCENARIOS_ROOT = Path(__file__).parent.parent / "tmp" / "assetopsbench" / "scenarios"
-
-# WO server is not implemented yet -- skip by default, allow opt-in via --include-wo
 _SCENARIO_FILES = {
-    "iot":       _SCENARIOS_ROOT / "single_agent" / "iot_utterance_meta.json",
-    "fmsr":      _SCENARIOS_ROOT / "single_agent" / "fmsr_utterance.json",
-    "tsfm":      _SCENARIOS_ROOT / "single_agent" / "tsfm_utterance.json",
-    "end2end":   _SCENARIOS_ROOT / "multi_agent"  / "end2end_utterance.json",
+    "iot":     _SCENARIOS_ROOT / "single_agent" / "iot_utterance_meta.json",
+    "fmsr":    _SCENARIOS_ROOT / "single_agent" / "fmsr_utterance.json",
+    "tsfm":    _SCENARIOS_ROOT / "single_agent" / "tsfm_utterance.json",
+    "end2end": _SCENARIOS_ROOT / "multi_agent"  / "end2end_utterance.json",
 }
 _WO_SCENARIO_FILE = _SCENARIOS_ROOT / "single_agent" / "wo_utterance.json"
 
 
 def load_completed_runs(out_path: str) -> set[tuple[int, int]]:
-    """Return the set of (scenario_id, run_id) pairs already saved in the JSONL file.
-
-    Used by --resume to skip scenarios that finished before a crash.
-    """
+    """Return (scenario_id, run_id) pairs already saved — used by --resume."""
     done: set[tuple[int, int]] = set()
     if not os.path.exists(out_path):
         return done
@@ -91,13 +81,6 @@ def load_scenarios(
     include_wo: bool = False,
     categories: list[str] | None = None,
 ) -> list[dict]:
-    """Load benchmark scenarios from the JSON files.
-
-    Each returned dict has: id, text, type, category, characteristic_form, source.
-    WO scenarios are skipped unless include_wo=True (server not yet implemented).
-    If categories is provided, only scenarios whose source is in categories are kept
-    (categories match keys of _SCENARIO_FILES, e.g. "fmsr", "iot", "tsfm", "end2end").
-    """
     scenarios = []
     for source, path in _SCENARIO_FILES.items():
         if categories is not None and source not in categories:
@@ -118,23 +101,13 @@ def load_scenarios(
 
 
 def _classify_steps(history) -> str:
-    """Derive a single status flag from the list of StepResult objects.
-
-    no_agent -- any step hit "Unknown agent" (server not registered)
-    failed   -- all steps failed
-    partial  -- some steps failed, some succeeded
-    success  -- all steps succeeded
-    """
     if not history:
         return "failed"
-
     no_agent = any(
-        step.error and "Unknown agent" in step.error
-        for step in history
+        step.error and "Unknown agent" in step.error for step in history
     )
     if no_agent:
         return "no_agent"
-
     n_failed = sum(1 for s in history if not s.success)
     if n_failed == len(history):
         return "failed"
@@ -144,11 +117,7 @@ def _classify_steps(history) -> str:
 
 
 async def run_scenario(runner: PlanExecuteRunner, scenario: dict, run_id: int) -> dict:
-    """Run one scenario through the MCP pipeline and return a result record.
-
-    The record always contains a 'status' field and an 'errors' list so
-    failures are never silently dropped.
-    """
+    """Run one scenario through the direct-agent pipeline."""
     question = scenario["text"]
     scenario_id = scenario["id"]
 
@@ -162,15 +131,12 @@ async def run_scenario(runner: PlanExecuteRunner, scenario: dict, run_id: int) -
         "type": scenario.get("type", ""),
         "deterministic": scenario.get("deterministic", None),
         "run_id": run_id,
-        "orchestration": "mcp",
+        "orchestration": "direct",
         "model_id": MODEL_ID,
     }
 
-    # wrap everything -- runner.run() makes 3 LLM calls (plan, execute, summarize)
-    # and any of them can raise on rate limits or network errors
     try:
         result = await runner.run(question)
-
         status = _classify_steps(result.history)
 
         steps = []
@@ -178,18 +144,15 @@ async def run_scenario(runner: PlanExecuteRunner, scenario: dict, run_id: int) -
         hw_records = []
 
         for step in result.history:
-            step_info = {
+            steps.append({
                 "step_number": step.step_number,
                 "agent": step.agent,
                 "tool": step.tool,
                 "success": step.success,
                 "error": step.error,
-            }
-            steps.append(step_info)
-
+            })
             if step.error:
                 errors.append(f"step {step.step_number} ({step.agent}.{step.tool}): {step.error}")
-
             if step.hardware is not None:
                 hw = step.hardware.to_dict()
                 hw["server"] = step.agent
@@ -214,7 +177,6 @@ async def run_scenario(runner: PlanExecuteRunner, scenario: dict, run_id: int) -
         }
 
     except Exception as exc:
-        # covers plan failure, execution failure, and summarize failure
         return {
             **base,
             "status": "error",
@@ -238,29 +200,31 @@ async def main(n_runs: int, warmup: int, include_wo: bool,
     if out_path is None:
         if categories is not None and len(categories) > 0:
             tag = "_".join(sorted(categories))
-            out_path = f"benchmarking_{tag}_mcp.jsonl"
+            out_path = f"benchmarking_{tag}_direct.jsonl"
         else:
-            out_path = "benchmarking_mcp.jsonl"
+            out_path = "benchmarking_direct_agent.jsonl"
 
     scenarios = load_scenarios(include_wo=include_wo, categories=categories)
-    n_wo_skipped = 0
-    if not include_wo and (categories is None or "wo" in categories):
-        with open(_WO_SCENARIO_FILE) as f:
-            n_wo_skipped = len(json.load(f))
 
-    # resume: find which (scenario_id, run_id) pairs are already done
     completed = load_completed_runs(out_path) if resume else set()
     if resume and completed:
         completed_scenarios = len({sid for sid, _ in completed})
         print(f"Resuming -- {len(completed)} runs already saved ({completed_scenarios} scenarios touched)")
 
-    print(f"Loaded {len(scenarios)} scenarios  (WO skipped: {n_wo_skipped})")
+    print(f"Loaded {len(scenarios)} scenarios (categories={categories or 'all'})")
     print(f"Model : {MODEL_ID}")
     print(f"Runs  : {n_runs} total, {warmup} warmup -> {n_runs - warmup} measured per scenario")
     print(f"Total measured runs: {len(scenarios) * (n_runs - warmup)}")
     print()
 
-    run_name = "mcp_" + ("_".join(sorted(categories)) if categories else "full")
+    # Only register agents we expect to need -- for FMSR-only runs we still
+    # register IoTAgent because FMSR scenarios often need sensor lists from IoT.
+    if categories is not None and "fmsr" in categories and "tsfm" not in categories:
+        registered_agents = ["IoTAgent", "Utilities", "FMSRAgent"]
+    else:
+        registered_agents = None  # register all
+
+    run_name = "direct_" + ("_".join(sorted(categories)) if categories else "full")
     wandb.init(
         project="assetopsbench-hw-profiling",
         name=run_name,
@@ -269,19 +233,19 @@ async def main(n_runs: int, warmup: int, include_wo: bool,
             "n_scenarios": len(scenarios),
             "n_runs": n_runs,
             "warmup": warmup,
-            "orchestration": "mcp",
-            "include_wo": include_wo,
+            "orchestration": "direct",
             "categories": categories or "all",
+            "registered_agents": registered_agents or "all",
         },
     )
 
     llm = LiteLLMBackend(MODEL_ID)
-    runner = PlanExecuteRunner(llm=llm)
+    tool_registry = _build_tool_registry(registered_agents)
+    executor = DirectExecutor(llm=llm, tool_registry=tool_registry)
+    runner = PlanExecuteRunner(llm=llm, executor=executor)
 
-    # counters for the end-of-run summary
     counts = {"success": 0, "partial": 0, "failed": 0, "no_agent": 0, "error": 0}
 
-    # append when resuming so existing records are preserved, overwrite otherwise
     file_mode = "a" if resume else "w"
     with open(out_path, file_mode) as out_f:
         for i, scenario in enumerate(scenarios):
@@ -294,7 +258,6 @@ async def main(n_runs: int, warmup: int, include_wo: bool,
                 if run_id > 0:
                     time.sleep(between_runs)
 
-                # skip runs that were already saved before the crash
                 if (sid, run_id) in completed:
                     print(f"  run {run_id} [SKIPPED -- already saved]")
                     continue
@@ -305,13 +268,11 @@ async def main(n_runs: int, warmup: int, include_wo: bool,
                     print(f"  run {run_id} [warmup] status={record['status']}")
                     continue
 
-                # always write to file regardless of status
                 out_f.write(json.dumps(record) + "\n")
-                out_f.flush()   # flush after each record so partial runs are readable
+                out_f.flush()
 
                 counts[record["status"]] = counts.get(record["status"], 0) + 1
 
-                # status line -- failures are always printed in full
                 status_flag = record["status"].upper()
                 n_steps = record.get("n_steps", 0)
                 n_failed = record.get("n_failed_steps", 0)
@@ -343,16 +304,15 @@ async def main(n_runs: int, warmup: int, include_wo: bool,
 
             time.sleep(between_scenarios)
 
-    # end-of-run summary
     total = sum(counts.values())
     print("\n" + "=" * 60)
-    print("BENCHMARK COMPLETE")
+    print("DIRECT-AGENT BENCHMARK COMPLETE")
     print("=" * 60)
     print(f"  Total measured runs : {total}")
     print(f"  success             : {counts['success']}  ({100*counts['success']//max(total,1)}%)")
     print(f"  partial             : {counts['partial']}")
     print(f"  failed              : {counts['failed']}")
-    print(f"  no_agent            : {counts['no_agent']}  (server not registered)")
+    print(f"  no_agent            : {counts['no_agent']}")
     print(f"  error               : {counts['error']}  (LLM/network exception)")
     print(f"\nResults saved to: {out_path}")
 
@@ -362,24 +322,21 @@ async def main(n_runs: int, warmup: int, include_wo: bool,
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="MCP full benchmark suite")
+    parser = argparse.ArgumentParser(description="Direct-agent (non-MCP) benchmark suite")
     parser.add_argument("--runs", type=int, default=N_RUNS,
                         help=f"Total runs per scenario (default {N_RUNS})")
     parser.add_argument("--warmup", type=int, default=WARMUP,
                         help=f"Warmup runs to discard (default {WARMUP})")
-    parser.add_argument("--between-runs", type=float, default=BETWEEN_RUNS_DELAY,
-                        help=f"Seconds between runs of the same scenario (default {BETWEEN_RUNS_DELAY})")
-    parser.add_argument("--between-scenarios", type=float, default=BETWEEN_SCENARIOS_DELAY,
-                        help=f"Seconds between different scenarios (default {BETWEEN_SCENARIOS_DELAY})")
+    parser.add_argument("--between-runs", type=float, default=BETWEEN_RUNS_DELAY)
+    parser.add_argument("--between-scenarios", type=float, default=BETWEEN_SCENARIOS_DELAY)
     parser.add_argument("--include-wo", action="store_true",
-                        help="Also run Work Order scenarios (WO server not yet implemented -- will produce no_agent results)")
+                        help="Also run Work Order scenarios (not registered in DirectExecutor -- will hit no_agent)")
     parser.add_argument("--resume", action="store_true",
-                        help="Resume from a previous run -- skips scenario/run_id pairs already saved in benchmarking_mcp.jsonl")
+                        help="Skip (scenario_id, run_id) pairs already present in the output JSONL")
     parser.add_argument("--categories", type=str, default=None,
-                        help="Comma-separated list of scenario sources to include (e.g. 'fmsr' or 'iot,fmsr'). "
-                             "Choices: iot, fmsr, tsfm, end2end. Defaults to all.")
+                        help="Comma-separated list of scenario sources (e.g. 'fmsr'). Choices: iot, fmsr, tsfm, end2end.")
     parser.add_argument("--out", type=str, default=None,
-                        help="Output JSONL path. Defaults to benchmarking_<categories>_mcp.jsonl.")
+                        help="Output JSONL path. Defaults to benchmarking_<categories>_direct.jsonl.")
     args = parser.parse_args()
     categories_list = (
         [c.strip() for c in args.categories.split(",") if c.strip()]
