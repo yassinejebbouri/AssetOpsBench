@@ -3,12 +3,18 @@
 Fetches ``ibm-research/AssetOpsBench`` and returns exactly
 ``SCENARIOS_PER_DOMAIN`` scenarios for each domain so that the benchmark
 runs a balanced 20-scenario suite.
+
+Synthetic scenarios can be appended by placing a JSON file at
+``profiling/synthetic_fmsr_scenarios.json``.  Each entry must have:
+  {"id": "201", "text": "...", "expected_agents": ["FMSRAgent", ...]}
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .config import (
@@ -17,6 +23,8 @@ from .config import (
     HF_DATASET_REPO,
     SCENARIOS_PER_DOMAIN,
 )
+
+_SYNTHETIC_PATH = Path(__file__).parent / "synthetic_fmsr_scenarios.json"
 
 _log = logging.getLogger(__name__)
 
@@ -67,10 +75,30 @@ def _parse_expected_agents(characteristic_form: str | None) -> list[str]:
     return [a for a in known if a.lower() in characteristic_form.lower()]
 
 
+def load_synthetic_scenarios(domain: str = "fmsr") -> list[BenchmarkScenario]:
+    """Load synthetic scenarios from the local JSON file."""
+    if not _SYNTHETIC_PATH.exists():
+        return []
+    entries = json.loads(_SYNTHETIC_PATH.read_text())
+    scenarios = []
+    for e in entries:
+        scenarios.append(BenchmarkScenario(
+            scenario_id=str(e["id"]),
+            text=str(e["text"]),
+            domain=domain,
+            characteristic_form=None,
+            expected_tool_sequence=e.get("expected_agents", _DOMAIN_DEFAULT_AGENTS[domain]),
+            raw=e,
+        ))
+    _log.info("Loaded %d synthetic scenarios from %s", len(scenarios), _SYNTHETIC_PATH)
+    return scenarios
+
+
 def load_scenarios(
     n_per_domain: int = SCENARIOS_PER_DOMAIN,
     domains: list[str] | None = None,
     hf_token: str | None = None,
+    include_synthetic: bool = False,
 ) -> list[BenchmarkScenario]:
     """Return a balanced list of benchmark scenarios.
 
@@ -133,6 +161,10 @@ def load_scenarios(
                     raw=raw,
                 )
             )
+
+    if include_synthetic and "fmsr" in domains:
+        synthetic = load_synthetic_scenarios("fmsr")
+        scenarios.extend(synthetic)
 
     _log.info(
         "Loaded %d scenarios across %d domains.", len(scenarios), len(domains)

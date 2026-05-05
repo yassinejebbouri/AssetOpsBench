@@ -16,6 +16,7 @@ supported by litellm works — the provider is encoded in the prefix.
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import os
 import re
@@ -131,8 +132,10 @@ def _call_asset2fm(asset_name: str) -> list[str]:
     raise last_exc
 
 
+@functools.lru_cache(maxsize=512)
 def _call_relevancy(asset_name: str, failure_mode: str, sensor: str) -> dict:
-    """Query the LLM for FM↔sensor relevancy. Retries up to _MAX_RETRIES times with exponential backoff."""
+    """Query the LLM for FM↔sensor relevancy. Retries up to _MAX_RETRIES times with exponential backoff.
+    Results are cached by (asset_name, failure_mode, sensor) — repeated calls across scenarios are free."""
     prompt = _RELEVANCY_PROMPT.format(
         asset_name=asset_name, failure_mode=failure_mode, sensor=sensor
     )
@@ -211,11 +214,26 @@ def get_failure_modes(asset_name: str) -> Union[FailureModesResult, ErrorResult]
         return ErrorResult(error=str(exc))
 
 
+def _filter_failure_modes(failure_modes: List[str], question: str) -> List[str]:
+    """Return the subset of failure_modes whose keywords appear in the question.
+
+    Tokenizes both the question and each failure mode name and checks for overlap.
+    Falls back to the full list if no match is found, so callers always get results.
+    """
+    q_tokens = set(re.sub(r"[^a-z0-9 ]", " ", question.lower()).split())
+    matched = [
+        fm for fm in failure_modes
+        if q_tokens & set(re.sub(r"[^a-z0-9 ]", " ", fm.lower()).split())
+    ]
+    return matched if matched else failure_modes
+
+
 @mcp.tool()
 async def get_failure_mode_sensor_mapping(
     asset_name: str,
     failure_modes: List[str],
     sensors: List[str],
+    question: str = "",
 ) -> Union[FailureModeSensorMappingResult, ErrorResult]:
     """For each (failure_mode, sensor) pair determines whether the sensor can detect
     the failure. Returns a bidirectional mapping (fm→sensors, sensor→fms) plus
@@ -223,7 +241,10 @@ async def get_failure_mode_sensor_mapping(
 
     All N×M pairs are evaluated concurrently (up to FMSR_CONCURRENCY=8 at a time)
     using asyncio.gather + asyncio.to_thread, reducing wall-clock time from O(N×M)
-    serial to O(N×M / concurrency) parallel."""
+    serial to O(N×M / concurrency) parallel.
+
+    If `question` is provided, failure_modes are pre-filtered to only those
+    relevant to the question (Fix 4: query-aware filtering), reducing N×M further."""
     if not asset_name:
         return ErrorResult(error="asset_name is required")
     if not failure_modes:
@@ -233,12 +254,30 @@ async def get_failure_mode_sensor_mapping(
     if not _llm_available:
         return ErrorResult(error="LLM unavailable")
 
+    if question:
+        filtered = _filter_failure_modes(failure_modes, question)
+        if len(filtered) < len(failure_modes):
+            logger.info(
+                "Fix4 filter: %d → %d failure modes for question: %s",
+                len(failure_modes), len(filtered), question[:80],
+            )
+        failure_modes = filtered
+
+    cache_info = _call_relevancy.cache_info()
+    logger.info("Fix5 cache before: hits=%d misses=%d", cache_info.hits, cache_info.misses)
+
     semaphore = asyncio.Semaphore(_CONCURRENCY)
     pairs = [(s, fm) for s in sensors for fm in failure_modes]
 
     async def _one_pair(s: str, fm: str) -> RelevancyEntry:
+        from workflow.profiler import HardwareProfiler  # type: ignore[import]
+
         async with semaphore:
-            gen = await asyncio.to_thread(_call_relevancy, asset_name, fm, s)
+            with HardwareProfiler(server="FMSRAgent", tool="get_failure_mode_sensor_mapping",
+                                  orchestration="parallel") as hw:
+                gen = await asyncio.to_thread(_call_relevancy, asset_name, fm, s)
+        logger.debug("pair (%s, %s): %.3fs  cpu=%.1f%%  ram=%.1fMB",
+                     fm, s, hw.wall_time_s, hw.cpu_percent_peak, hw.ram_mb_peak)
         return RelevancyEntry(
             asset_name=asset_name,
             failure_mode=fm,
@@ -255,6 +294,9 @@ async def get_failure_mode_sensor_mapping(
     except Exception as exc:
         logger.error("_call_relevancy failed: %s", exc)
         return ErrorResult(error=str(exc))
+
+    cache_info = _call_relevancy.cache_info()
+    logger.info("Fix5 cache after: hits=%d misses=%d size=%d", cache_info.hits, cache_info.misses, cache_info.currsize)
 
     fm2sensor: Dict[str, List[str]] = {}
     sensor2fm: Dict[str, List[str]] = {}

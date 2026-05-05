@@ -32,13 +32,16 @@ _log = logging.getLogger(__name__)
 
 @dataclass
 class ToolCallRecord:
-    """Timing record for a single tool invocation."""
+    """Timing and hardware record for a single tool invocation."""
 
     agent: str
     tool: str
     duration_seconds: float
     success: bool
     step_number: int = 0
+    cpu_percent_peak: float = 0.0
+    ram_mb_peak: float = 0.0
+    io_read_bytes: int = 0
 
 
 @dataclass
@@ -108,18 +111,27 @@ class _TimedExecutor:
         return results
 
     async def execute_step(self, step: Any, context: dict, question: str) -> Any:
-        start = time.perf_counter()
-        result = await self._inner.execute_step(step, context, question)
-        elapsed = time.perf_counter() - start
+        from workflow.profiler import HardwareProfiler  # type: ignore[import]
+
+        with HardwareProfiler(
+            server=step.agent,
+            tool=step.tool or "none",
+            scenario_id=getattr(self, "_scenario_id", ""),
+            orchestration="MetaAgent",
+        ) as hw:
+            result = await self._inner.execute_step(step, context, question)
 
         if step.tool and step.tool.lower() not in ("none", "null", ""):
             self.tool_call_log.append(
                 ToolCallRecord(
                     agent=step.agent,
                     tool=step.tool,
-                    duration_seconds=elapsed,
+                    duration_seconds=hw.wall_time_s,
                     success=result.success,
                     step_number=step.step_number,
+                    cpu_percent_peak=hw.cpu_percent_peak,
+                    ram_mb_peak=hw.ram_mb_peak,
+                    io_read_bytes=hw.io_read_bytes,
                 )
             )
         return result
@@ -147,6 +159,7 @@ class InstrumentedPlanExecuteRunner:
         llm: Any,
         server_paths: dict[str, Path | str] | None = None,
         orchestrator_type: str = "MetaAgent",
+        prefetch_db_context: bool = False,
     ) -> None:
         from workflow.planner import Planner  # type: ignore[import]
 
@@ -154,9 +167,12 @@ class InstrumentedPlanExecuteRunner:
         self._planner = Planner(llm)
         self._executor = _TimedExecutor(llm, server_paths)
         self._orchestrator_type = orchestrator_type
+        self._prefetch_db_context = prefetch_db_context
+        self._db_context: dict | None = None
 
     async def run(self, question: str) -> OrchestratorRunResult:
         """Run the full plan-execute loop and return a timed result."""
+        from workflow.planner import Planner  # type: ignore[import]
         from workflow.runner import _SUMMARIZE_PROMPT  # type: ignore[import]
 
         self._executor.reset()
@@ -167,6 +183,14 @@ class InstrumentedPlanExecuteRunner:
 
         try:
             agent_descriptions = await self._executor.get_agent_descriptions()
+
+            # Prefetch db context once and cache for the session
+            if self._prefetch_db_context:
+                if self._db_context is None:
+                    from workflow.runner import fetch_db_context  # type: ignore[import]
+                    self._db_context = await fetch_db_context()
+                self._planner = Planner(self._llm, db_context=self._db_context)
+
             plan = self._planner.generate_plan(question, agent_descriptions)
             history = await self._executor.execute_plan(plan, question)
 

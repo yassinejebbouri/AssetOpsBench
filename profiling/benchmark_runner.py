@@ -85,6 +85,8 @@ class BenchmarkConfig:
     save_results: bool = True
     enable_agentive: bool = True
     hf_token: str | None = None
+    prefetch_db_context: bool = False
+    include_synthetic: bool = False
 
 
 # ── Per-run result ─────────────────────────────────────────────────────────────
@@ -137,6 +139,7 @@ class BenchmarkRunner:
             n_per_domain=self._cfg.n_per_domain,
             domains=self._cfg.domains,
             hf_token=self._cfg.hf_token,
+            include_synthetic=self._cfg.include_synthetic,
         )
         _log.info("Running %d scenarios across %d domains.", len(scenarios), len(self._cfg.domains))
 
@@ -257,6 +260,7 @@ class BenchmarkRunner:
         runner = InstrumentedPlanExecuteRunner(
             llm=llm,
             orchestrator_type=ORCHESTRATOR_META_AGENT,
+            prefetch_db_context=self._cfg.prefetch_db_context,
         )
         return await runner.run(scenario.text)
 
@@ -314,6 +318,9 @@ class BenchmarkRunner:
                     "tool": r.tool,
                     "duration_seconds": r.duration_seconds,
                     "success": r.success,
+                    "cpu_percent_peak": r.cpu_percent_peak,
+                    "ram_mb_peak": r.ram_mb_peak,
+                    "io_read_bytes": r.io_read_bytes,
                 }
                 for r in record.result.tool_call_log
             ],

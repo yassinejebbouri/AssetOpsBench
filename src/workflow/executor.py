@@ -153,6 +153,10 @@ class Executor:
             else:
                 resolved_args = step.tool_args
 
+            # Fix 4: inject the original question so FMSR can filter failure modes
+            if step.tool == "get_failure_mode_sensor_mapping" and "question" not in resolved_args:
+                resolved_args = {**resolved_args, "question": question}
+
             response = await _call_tool(server_path, step.tool, resolved_args)
             return StepResult(
                 step_number=step.step_number,

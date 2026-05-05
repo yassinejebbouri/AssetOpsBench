@@ -125,6 +125,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Print the scenario list and exit without running anything.",
     )
     p.add_argument(
+        "--synthetic",
+        action="store_true",
+        help="Include 80 synthetic FMSR scenarios (ids 201-280) for 100-query benchmark.",
+    )
+    p.add_argument(
+        "--prefetch-db-context",
+        action="store_true",
+        help="Prefetch sites/assets/sensors/failure_modes and inject into planner prompt (Fix 2).",
+    )
+    p.add_argument(
         "--verbose",
         action="store_true",
         help="Enable DEBUG logging.",
@@ -216,6 +226,7 @@ def main() -> None:
             n_per_domain=args.n_per_domain,
             domains=args.domains,
             hf_token=hf_token,
+            include_synthetic=args.synthetic,
         )
         for s in scenarios:
             print(f"  [{s.domain:6s}] {s.scenario_id:6s}  {s.text[:80]}")
@@ -233,7 +244,9 @@ def main() -> None:
         wandb_run_name=args.wandb_run_name,
         save_results=not args.no_save,
         enable_agentive=not args.no_agentive,
+        prefetch_db_context=args.prefetch_db_context,
         hf_token=args.hf_token or os.getenv("HF_APIKEY"),
+        include_synthetic=args.synthetic,
     )
 
     runner = BenchmarkRunner(cfg)
