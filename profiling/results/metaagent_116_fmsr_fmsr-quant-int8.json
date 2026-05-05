@@ -1,0 +1,58 @@
+{
+  "scenario_id": "116",
+  "domain": "fmsr",
+  "question": "Generate a machine learning recipe for detecting overheating failure for Chiller 6. Result should include feature sensors and target sensor.",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Machine Learning Recipe for Detecting Overheating Failure in Chiller 6\n\n## Overview\nBased on the failure mode analysis for Chiller 6, the primary overheating failure mode identified is **Compressor Overheating** (caused by normal wear and overheating conditions).\n\n## Recommended ML Recipe Structure\n\n**Target Sensor:**\n- Compressor discharge temperature or compressor case temperature\n\n**Feature Sensors (recommended for model input):**\n- Compressor inlet temperature\n- Condenser outlet temperature\n- Evaporator outlet temperature\n- Refrigerant pressure (discharge side)\n- Refrigerant pressure (suction side)\n- Cooling water inlet temperature\n- Cooling water outlet temperature\n- Compressor motor current/power consumption\n- Ambient air temperature (if available)\n- Chiller load percentage or capacity\n\n## Model Approach\n- **Algorithm Type:** Regression or anomaly detection model\n- **Objective:** Predict compressor temperature rise or detect abnormal temperature patterns that precede overheating failure\n- **Training Data:** Historical sensor readings correlated with compressor overheating events\n\n**Note:** Step 3 encountered a limitation in sensor mapping due to missing sensor inventory data. For implementation, coordinate with your asset management system to confirm the exact sensor names and availability on Chiller 6.",
+  "total_time_seconds": 9.621717416041065,
+  "num_tool_calls": 3,
+  "tool_call_sequence": [
+    "Utilities/current_date_time",
+    "FMSRAgent/get_failure_modes",
+    "FMSRAgent/get_failure_mode_sensor_mapping"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 3052,
+    "completion_tokens": 732,
+    "total_tokens": 3784,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 0.3333333333333333,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "Utilities",
+      "tool": "current_date_time",
+      "duration_seconds": 0.31355879199691117,
+      "success": true,
+      "cpu_percent_peak": 96.7,
+      "ram_mb_peak": 463.0,
+      "io_read_bytes": 0
+    },
+    {
+      "step": 2,
+      "agent": "FMSRAgent",
+      "tool": "get_failure_modes",
+      "duration_seconds": 0.3075954170199111,
+      "success": true,
+      "cpu_percent_peak": 88.4,
+      "ram_mb_peak": 463.0,
+      "io_read_bytes": 0
+    },
+    {
+      "step": 3,
+      "agent": "FMSRAgent",
+      "tool": "get_failure_mode_sensor_mapping",
+      "duration_seconds": 0.31069066701456904,
+      "success": true,
+      "cpu_percent_peak": 88.6,
+      "ram_mb_peak": 463.0,
+      "io_read_bytes": 0
+    }
+  ]
+}
