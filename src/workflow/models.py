@@ -61,6 +61,8 @@ class StepResult:
     error: Optional[str] = None
     tool: str = ""
     tool_args: dict = field(default_factory=dict)
+    wall_s: float = 0.0          # wall-clock seconds for the MCP tool call
+    metadata: dict = field(default_factory=dict)  # arbitrary per-step extras
 
     @property
     def success(self) -> bool:

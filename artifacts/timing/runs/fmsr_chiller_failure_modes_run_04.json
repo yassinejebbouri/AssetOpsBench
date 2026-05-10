@@ -1,0 +1,21 @@
+{
+  "run_name": "fmsr_chiller_failure_modes_run_04",
+  "group": "fmsr_only",
+  "phases": {
+    "question_to_answer": {
+      "count": 1,
+      "total_seconds": 16.560545,
+      "average_seconds": 16.560545
+    }
+  },
+  "total_wall_time_seconds": 16.561162,
+  "metadata": {
+    "scenario_name": "fmsr_chiller_failure_modes",
+    "question_length_chars": 39,
+    "plan_steps": 3,
+    "tool_calls": 2,
+    "server_sequence": "FMSRAgent,IoTAgent,FMSRAgent",
+    "unique_servers": "FMSRAgent,IoTAgent"
+  },
+  "created_at_unix": 1775496060.7210398
+}

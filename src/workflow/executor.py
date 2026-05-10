@@ -16,11 +16,13 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from pathlib import Path
 from typing import Any
 
 from llm import LLMBackend
 from .models import Plan, PlanStep, StepResult
+from .pruner import prune_fmsr_inputs, DEFAULT_THRESHOLD
 
 _log = logging.getLogger(__name__)
 
@@ -64,9 +66,13 @@ class Executor:
         self,
         llm: LLMBackend,
         server_paths: dict[str, Path | str] | None = None,
+        prune_fmsr: bool = False,
+        prune_threshold: float = DEFAULT_THRESHOLD,
     ) -> None:
         self._llm = llm
         self._server_paths = DEFAULT_SERVER_PATHS if server_paths is None else server_paths
+        self._prune_fmsr = prune_fmsr
+        self._prune_threshold = prune_threshold
 
     async def get_agent_descriptions(self) -> dict[str, str]:
         """Query each registered MCP server and return formatted tool signatures."""
@@ -120,6 +126,17 @@ class Executor:
            them from prior step results.
         4. Call the tool and return its result.
         """
+
+        if not step.tool or step.tool.lower() in ("none", "null"):
+            return StepResult(
+                step_number=step.step_number,
+                task=step.task,
+                agent=step.agent,
+                response=step.expected_output,
+                tool=step.tool,
+                tool_args=step.tool_args,
+            )
+
         server_path = self._server_paths.get(step.agent)
         if server_path is None:
             return StepResult(
@@ -131,16 +148,6 @@ class Executor:
                     f"Unknown agent '{step.agent}'. "
                     f"Registered agents: {list(self._server_paths)}"
                 ),
-            )
-
-        if not step.tool or step.tool.lower() in ("none", "null"):
-            return StepResult(
-                step_number=step.step_number,
-                task=step.task,
-                agent=step.agent,
-                response=step.expected_output,
-                tool=step.tool,
-                tool_args=step.tool_args,
             )
 
         try:
@@ -155,7 +162,52 @@ class Executor:
             else:
                 resolved_args = step.tool_args
 
+            # Prune FM x sensor grid before the mapping call if enabled
+            step_metadata: dict = {}
+            if (
+                self._prune_fmsr
+                and step.tool == "get_failure_mode_sensor_mapping"
+            ):
+                fms = resolved_args.get("failure_modes", [])
+                sss = resolved_args.get("sensors", [])
+                # arg-resolver may hand back a JSON string rather than a list
+                if isinstance(fms, str):
+                    try:
+                        fms = json.loads(fms)
+                    except json.JSONDecodeError:
+                        fms = [fms]
+                if isinstance(sss, str):
+                    try:
+                        sss = json.loads(sss)
+                    except json.JSONDecodeError:
+                        sss = [sss]
+                if fms and sss:
+                    kept_fms, kept_sensors, prune_meta = prune_fmsr_inputs(
+                        query=question,
+                        failure_modes=fms,
+                        sensors=sss,
+                        threshold=self._prune_threshold,
+                        asset_name=resolved_args.get("asset_name"),
+                    )
+                    resolved_args = {
+                        **resolved_args,
+                        "failure_modes": kept_fms,
+                        "sensors":       kept_sensors,
+                    }
+                    step_metadata["prune"] = prune_meta
+                    _log.info(
+                        "Step %d FMSR pruned: %d FMs → %d, %d sensors → %d "
+                        "(%.0f%% pairs eliminated)",
+                        step.step_number,
+                        len(fms), len(kept_fms),
+                        len(sss), len(kept_sensors),
+                        prune_meta["pruning_ratio"] * 100,
+                    )
+
+            t0 = time.perf_counter()
             response = await _call_tool(server_path, step.tool, resolved_args)
+            wall_s = round(time.perf_counter() - t0, 4)
+
             return StepResult(
                 step_number=step.step_number,
                 task=step.task,
@@ -163,6 +215,8 @@ class Executor:
                 response=response,
                 tool=step.tool,
                 tool_args=resolved_args,
+                wall_s=wall_s,
+                metadata=step_metadata,
             )
         except Exception as exc:  # noqa: BLE001
             return StepResult(
