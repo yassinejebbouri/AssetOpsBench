@@ -1,0 +1,41 @@
+{
+  "scenario_id": "205",
+  "domain": "tsfm",
+  "question": "Is LSTM model supported in TSFM?",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Answer\n\n**No, LSTM models are not supported in TSFM.** \n\nTSFM (Time Series Foundation Models) currently supports only TinyTimeMixer (TTM) models for time series forecasting tasks. The available pre-trained checkpoints are all TTM-based models with varying context lengths and domain specializations (general and energy-tuned variants).",
+  "total_time_seconds": 8.71925008299877,
+  "num_tool_calls": 2,
+  "tool_call_sequence": [
+    "TSFMAgent/get_ai_tasks",
+    "TSFMAgent/get_tsfm_models"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 3167,
+    "completion_tokens": 371,
+    "total_tokens": 3538,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 0.5,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "TSFMAgent",
+      "tool": "get_ai_tasks",
+      "duration_seconds": 0.4372204579995014,
+      "success": true
+    },
+    {
+      "step": 2,
+      "agent": "TSFMAgent",
+      "tool": "get_tsfm_models",
+      "duration_seconds": 0.4184231249964796,
+      "success": true
+    }
+  ]
+}

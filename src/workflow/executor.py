@@ -176,12 +176,10 @@ class Executor:
         try:
             if _has_placeholders(step.tool_args):
                 _log.info(
-                    "Step %d has unresolved args — calling LLM to resolve.",
+                    "Step %d has unresolved args — resolving directly from context.",
                     step.step_number,
                 )
-                resolved_args = await _resolve_args_with_llm(
-                    step.task, step.tool, step.tool_args, context, self._llm
-                )
+                resolved_args = _resolve_args(step.tool_args, context)
             else:
                 resolved_args = step.tool_args
 
@@ -229,6 +227,11 @@ class Executor:
                         len(sss), len(kept_sensors),
                         prune_meta["pruning_ratio"] * 100,
                     )
+
+            # Inject original question into FMSR call so the server can filter
+            # failure modes by relevance to the question without an extra LLM hop.
+            if step.tool == "get_failure_mode_sensor_mapping" and "question" not in resolved_args:
+                resolved_args = {**resolved_args, "question": question}
 
             t0 = time.perf_counter()
             with HardwareProfiler(

@@ -1,0 +1,33 @@
+{
+  "scenario_id": "113",
+  "domain": "fmsr",
+  "question": " If Evaporator Water side fouling occurs for Chiller 6, which sensor is most relevant for monitoring this specific failure?",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Summary\n\nI was unable to determine which sensor is most relevant for monitoring Evaporator Water side fouling in Chiller 6 due to a rate limit error when attempting to access the failure mode to sensor mapping data.\n\n**Recommendation:** Please retry this query after a brief delay, as the system encountered a temporary rate limit restriction (429 error) from the Watson AI service.",
+  "total_time_seconds": 9.850945915968623,
+  "num_tool_calls": 1,
+  "tool_call_sequence": [
+    "FMSRAgent/get_failure_mode_sensor_mapping"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 3213,
+    "completion_tokens": 355,
+    "total_tokens": 3568,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 0.5,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "FMSRAgent",
+      "tool": "get_failure_mode_sensor_mapping",
+      "duration_seconds": 1.7406158749945462,
+      "success": true
+    }
+  ]
+}

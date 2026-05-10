@@ -1,0 +1,33 @@
+{
+  "scenario_id": "3",
+  "domain": "iot",
+  "question": "What assets can be found at the MAIN site?",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Assets at the MAIN Site\n\nThere is **1 asset** located at the MAIN site:\n\n- **Chiller 6**",
+  "total_time_seconds": 4.9943721250019735,
+  "num_tool_calls": 1,
+  "tool_call_sequence": [
+    "IoTAgent/assets"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 2710,
+    "completion_tokens": 110,
+    "total_tokens": 2820,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 1.0,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "IoTAgent",
+      "tool": "assets",
+      "duration_seconds": 0.469040916999802,
+      "success": true
+    }
+  ]
+}

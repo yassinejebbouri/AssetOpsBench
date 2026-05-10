@@ -1,0 +1,33 @@
+{
+  "scenario_id": "202",
+  "domain": "tsfm",
+  "question": "What are time series pretrained models are available in system?",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Available Time Series Pretrained Models\n\nThe system has **4 pretrained time-series forecasting models** available:\n\n1. **ttm_96_28** - General forecasting model with context length 96\n2. **ttm_512_96** - General forecasting model with context length 512\n3. **ttm_energy_96_28** - Energy-tuned forecasting model with context length 96\n4. **ttm_energy_512_96** - Energy-tuned forecasting model with context length 512\n\nModels are available in two variants: general-purpose and energy-domain-specific, each with different context lengths (96 or 512 timesteps).",
+  "total_time_seconds": 5.424794874998042,
+  "num_tool_calls": 1,
+  "tool_call_sequence": [
+    "TSFMAgent/get_tsfm_models"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 2902,
+    "completion_tokens": 270,
+    "total_tokens": 3172,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 0.5,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "TSFMAgent",
+      "tool": "get_tsfm_models",
+      "duration_seconds": 0.4347607919917209,
+      "success": true
+    }
+  ]
+}

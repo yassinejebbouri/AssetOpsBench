@@ -1,0 +1,23 @@
+{
+  "scenario_id": "101",
+  "domain": "fmsr",
+  "question": "List all failure modes of asset Chiller.",
+  "orchestrator_type": "MetaAgent",
+  "answer": "",
+  "total_time_seconds": 1.319602167000994,
+  "num_tool_calls": 0,
+  "tool_call_sequence": [],
+  "tokens_used": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "num_llm_calls": 0
+  },
+  "tool_call_accuracy": 0.0,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": false,
+  "error": "litellm.BadRequestError: LLM Provider NOT provided. Pass in the LLM provider you are trying to call. You passed model=claude/claude-haiku-4-5\n Pass model as E.g. For 'Huggingface' inference endpoints pass in `completion(model='huggingface/starcoder',..)` Learn more: https://docs.litellm.ai/docs/providers",
+  "tool_call_details": []
+}

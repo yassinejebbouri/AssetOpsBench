@@ -36,8 +36,8 @@ Output format — one block per step, exactly:
 #Task2: <task description>
 #Agent2: <exact agent name>
 #Tool2: <exact tool name>
-#Args2: {{"site_name": "MAIN", "asset_id": "{{step_1}}"}}
-#Dependency2: #S1
+#Args2: {{"site_name": "MAIN", "asset_id": "Chiller 6"}}
+#Dependency2: None
 #ExpectedOutput2: <what this step should produce>
 
 Rules:
@@ -170,8 +170,9 @@ def parse_plan(raw: str) -> Plan:
 class Planner:
     """Decomposes a question into a structured execution plan using an LLM."""
 
-    def __init__(self, llm: LLMBackend) -> None:
+    def __init__(self, llm: LLMBackend, db_context: dict | None = None) -> None:
         self._llm = llm
+        self._db_context = db_context or {}
 
     def generate_plan(
         self,

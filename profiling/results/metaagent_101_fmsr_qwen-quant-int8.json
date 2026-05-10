@@ -1,0 +1,36 @@
+{
+  "scenario_id": "101",
+  "domain": "fmsr",
+  "question": "List all failure modes of asset Chiller.",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Failure Modes of Chiller Asset\n\nThe Chiller asset has the following failure modes:\n\n1. **Compressor Overheating** \u2014 Failed due to normal wear and overheating\n2. **Heat Exchanger Fans** \u2014 Degraded motor or worn bearing due to normal use\n3. **Evaporator Water side fouling**\n4. **Condenser Water side fouling**\n5. **Condenser Improper water side flow rate**\n6. **Purge Unit Excessive purge**\n7. **Refrigerant Operated Control Valve Failed spring**",
+  "total_time_seconds": 4.861809665977489,
+  "num_tool_calls": 1,
+  "tool_call_sequence": [
+    "FMSRAgent/get_failure_modes"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 2872,
+    "completion_tokens": 242,
+    "total_tokens": 3114,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 0.5,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "FMSRAgent",
+      "tool": "get_failure_modes",
+      "duration_seconds": 0.31440820900024846,
+      "success": true,
+      "cpu_percent_peak": 93.1,
+      "ram_mb_peak": 451.953125,
+      "io_read_bytes": 0
+    }
+  ]
+}

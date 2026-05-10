@@ -1,0 +1,33 @@
+{
+  "scenario_id": "201",
+  "domain": "tsfm",
+  "question": "What types of time series analysis are supported?",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Supported Time Series Analysis Types\n\nThe system supports the following types of time series analysis:\n\n1. **Time Series Anomaly Detection** \u2014 Identifies unusual patterns or outliers in time series data\n2. **Multivariate Forecasting** \u2014 Predicts future values across multiple related time series variables\n3. **Forecasting Model Finetuning** \u2014 Optimizes multivariate forecasting models for specific use cases\n4. **Forecasting Model Evaluation** \u2014 Assesses the performance and accuracy of forecasting models",
+  "total_time_seconds": 4.31466512499901,
+  "num_tool_calls": 1,
+  "tool_call_sequence": [
+    "TSFMAgent/get_ai_tasks"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 2823,
+    "completion_tokens": 230,
+    "total_tokens": 3053,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 0.5,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "TSFMAgent",
+      "tool": "get_ai_tasks",
+      "duration_seconds": 0.47106654099479783,
+      "success": true
+    }
+  ]
+}

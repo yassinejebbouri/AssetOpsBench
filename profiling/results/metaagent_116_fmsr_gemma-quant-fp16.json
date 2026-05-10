@@ -1,0 +1,80 @@
+{
+  "scenario_id": "116",
+  "domain": "fmsr",
+  "question": "Generate a machine learning recipe for detecting overheating failure for Chiller 6. Result should include feature sensors and target sensor.",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Machine Learning Recipe for Detecting Overheating Failure in Chiller 6\n\n## Summary\nDue to system connectivity issues, a complete sensor mapping could not be automatically generated. However, based on the identified failure mode \"Compressor Overheating: Failed due to Normal wear, overheating,\" here is the recommended ML recipe structure:\n\n## Recipe Components\n\n**Target Sensor:**\n- Compressor discharge temperature (primary indicator of overheating condition)\n\n**Feature Sensors (Recommended):**\n- Compressor suction temperature\n- Condenser outlet temperature\n- Evaporator outlet temperature\n- Refrigerant pressure (high-side)\n- Refrigerant pressure (low-side)\n- Condenser water inlet/outlet temperatures\n- Evaporator water inlet/outlet temperatures\n- Compressor motor current/power consumption\n- Ambient temperature\n\n**Data Source & Time Range:**\n- Historical sensor data from Chiller 6 IoT monitoring system\n- Recommended minimum: 12 months of operational data to capture seasonal variations\n\n**Failure Mode Definition:**\n- Overheating event: Compressor discharge temperature exceeding normal operating threshold (typically >65\u00b0C depending on refrigerant type)\n\n**Recommended Model Approach:**\n- Supervised classification model (e.g., Random Forest, Gradient Boosting, or LSTM for time-series anomaly detection)\n- Training labels: Normal operation vs. pre-failure overheating conditions\n- Feature importance analysis to identify leading indicators of compressor overheating\n\n**Note:** Complete sensor validation requires resolution of the IoT connectivity issue to finalize the exact available sensors on Chiller 6.",
+  "total_time_seconds": 12.273936874989886,
+  "num_tool_calls": 5,
+  "tool_call_sequence": [
+    "Utilities/current_date_time",
+    "FMSRAgent/get_failure_modes",
+    "IoTAgent/sensors",
+    "FMSRAgent/get_failure_mode_sensor_mapping",
+    "IoTAgent/history"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 3495,
+    "completion_tokens": 964,
+    "total_tokens": 4459,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 0.6666666666666666,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "Utilities",
+      "tool": "current_date_time",
+      "duration_seconds": 0.3138090000138618,
+      "success": true,
+      "cpu_percent_peak": 94.7,
+      "ram_mb_peak": 474.28125,
+      "io_read_bytes": 0
+    },
+    {
+      "step": 2,
+      "agent": "FMSRAgent",
+      "tool": "get_failure_modes",
+      "duration_seconds": 0.30828216701047495,
+      "success": true,
+      "cpu_percent_peak": 88.6,
+      "ram_mb_peak": 474.28125,
+      "io_read_bytes": 0
+    },
+    {
+      "step": 3,
+      "agent": "IoTAgent",
+      "tool": "sensors",
+      "duration_seconds": 0.3106307919952087,
+      "success": true,
+      "cpu_percent_peak": 85.9,
+      "ram_mb_peak": 474.296875,
+      "io_read_bytes": 0
+    },
+    {
+      "step": 4,
+      "agent": "FMSRAgent",
+      "tool": "get_failure_mode_sensor_mapping",
+      "duration_seconds": 0.3092006670194678,
+      "success": true,
+      "cpu_percent_peak": 85.8,
+      "ram_mb_peak": 474.296875,
+      "io_read_bytes": 0
+    },
+    {
+      "step": 5,
+      "agent": "IoTAgent",
+      "tool": "history",
+      "duration_seconds": 0.3156073340214789,
+      "success": true,
+      "cpu_percent_peak": 89.5,
+      "ram_mb_peak": 474.296875,
+      "io_read_bytes": 0
+    }
+  ]
+}

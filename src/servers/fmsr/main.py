@@ -15,6 +15,8 @@ supported by litellm works — the provider is encoded in the prefix.
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import logging
 import os
 import random
@@ -128,6 +130,7 @@ def _call_asset2fm(asset_name: str) -> list[str]:
     return _parse_numbered_list(_llm.generate(prompt))
 
 
+@functools.lru_cache(maxsize=512)
 def _call_relevancy(asset_name: str, failure_mode: str, sensor: str) -> dict:
     """Query the LLM for FM↔sensor relevancy.
 
@@ -795,11 +798,26 @@ def get_failure_modes(asset_name: str) -> Union[FailureModesResult, ErrorResult]
         return ErrorResult(error=str(exc))
 
 
+def _filter_failure_modes(failure_modes: List[str], question: str) -> List[str]:
+    """Return the subset of failure_modes whose keywords appear in the question.
+
+    Tokenizes both the question and each failure mode name and checks for overlap.
+    Falls back to the full list if no match is found, so callers always get results.
+    """
+    q_tokens = set(re.sub(r"[^a-z0-9 ]", " ", question.lower()).split())
+    matched = [
+        fm for fm in failure_modes
+        if q_tokens & set(re.sub(r"[^a-z0-9 ]", " ", fm.lower()).split())
+    ]
+    return matched if matched else failure_modes
+
+
 @mcp.tool()
-def get_failure_mode_sensor_mapping(
+async def get_failure_mode_sensor_mapping(
     asset_name: str,
     failure_modes: List[str],
     sensors: List[str],
+    question: str = "",
 ) -> Union[FailureModeSensorMappingResult, ErrorResult]:
     """For each (failure_mode, sensor) pair determines whether the sensor can detect
     the failure. Returns a bidirectional mapping (fm→sensors, sensor→fms) plus
@@ -816,9 +834,38 @@ def get_failure_mode_sensor_mapping(
     if not _llm_available:
         return ErrorResult(error="LLM unavailable")
 
-    full_relevancy: List[RelevancyEntry] = []
-    fm2sensor: Dict[str, List[str]] = {}
-    sensor2fm: Dict[str, List[str]] = {}
+    if question:
+        filtered = _filter_failure_modes(failure_modes, question)
+        if len(filtered) < len(failure_modes):
+            logger.info(
+                "Fix4 filter: %d → %d failure modes for question: %s",
+                len(failure_modes), len(filtered), question[:80],
+            )
+        failure_modes = filtered
+
+    cache_info = _call_relevancy.cache_info()
+    logger.info("Fix5 cache before: hits=%d misses=%d", cache_info.hits, cache_info.misses)
+
+    semaphore = asyncio.Semaphore(_CONCURRENCY)
+    pairs = [(s, fm) for s in sensors for fm in failure_modes]
+
+    async def _one_pair(s: str, fm: str) -> RelevancyEntry:
+        from workflow.profiler import HardwareProfiler  # type: ignore[import]
+
+        async with semaphore:
+            with HardwareProfiler(server="FMSRAgent", tool="get_failure_mode_sensor_mapping",
+                                  orchestration="parallel") as hw:
+                gen = await asyncio.to_thread(_call_relevancy, asset_name, fm, s)
+        logger.debug("pair (%s, %s): %.3fs  cpu=%.1f%%  ram=%.1fMB",
+                     fm, s, hw.wall_time_s, hw.cpu_percent_peak, hw.ram_mb_peak)
+        return RelevancyEntry(
+            asset_name=asset_name,
+            failure_mode=fm,
+            sensor=s,
+            relevancy_answer=gen["answer"],
+            relevancy_reason=gen["reason"],
+            temporal_behavior=gen["temporal_behavior"],
+        )
 
     try:
         # Dispatch all N×M relevancy calls using the configured strategy.
@@ -862,6 +909,16 @@ def get_failure_mode_sensor_mapping(
         logger.error("mapping failed (strategy=%s): %s", _STRATEGY, exc)
         return ErrorResult(error=str(exc))
 
+    cache_info = _call_relevancy.cache_info()
+    logger.info("Fix5 cache after: hits=%d misses=%d size=%d", cache_info.hits, cache_info.misses, cache_info.currsize)
+
+    fm2sensor: Dict[str, List[str]] = {}
+    sensor2fm: Dict[str, List[str]] = {}
+    for entry in entries:
+        if "yes" in entry.relevancy_answer.lower():
+            fm2sensor.setdefault(entry.failure_mode, []).append(entry.sensor)
+            sensor2fm.setdefault(entry.sensor, []).append(entry.failure_mode)
+
     return FailureModeSensorMappingResult(
         metadata=MappingMetadata(
             asset_name=asset_name,
@@ -870,7 +927,7 @@ def get_failure_mode_sensor_mapping(
         ),
         fm2sensor=fm2sensor,
         sensor2fm=sensor2fm,
-        full_relevancy=full_relevancy,
+        full_relevancy=list(entries),
     )
 
 

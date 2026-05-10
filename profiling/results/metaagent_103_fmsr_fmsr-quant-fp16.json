@@ -1,0 +1,36 @@
+{
+  "scenario_id": "103",
+  "domain": "fmsr",
+  "question": "List all failure modes of asset Wind Turbine.",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Summary\n\nUnable to retrieve the failure modes for the Wind Turbine asset. The request failed due to a rate limit error from the Watson AI service (exceeded 2 requests per second). Please retry the request after a brief delay.",
+  "total_time_seconds": 5.95957454200834,
+  "num_tool_calls": 1,
+  "tool_call_sequence": [
+    "FMSRAgent/get_failure_modes"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 2937,
+    "completion_tokens": 141,
+    "total_tokens": 3078,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 0.5,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "FMSRAgent",
+      "tool": "get_failure_modes",
+      "duration_seconds": 2.2885117910336703,
+      "success": true,
+      "cpu_percent_peak": 94.0,
+      "ram_mb_peak": 455.328125,
+      "io_read_bytes": 0
+    }
+  ]
+}

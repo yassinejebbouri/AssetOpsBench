@@ -1,0 +1,33 @@
+{
+  "scenario_id": "203",
+  "domain": "tsfm",
+  "question": "Are any time series forecasting models supported?",
+  "orchestrator_type": "MetaAgent",
+  "answer": "# Summary\n\nYes, multiple time series forecasting models are supported. The system includes four pretrained forecasting models:\n\n1. **ttm_96_28** - Context length 96\n2. **ttm_512_96** - Context length 512\n3. **ttm_energy_96_28** - Energy-tuned variant with context length 96\n4. **ttm_energy_512_96** - Energy-tuned variant with context length 512\n\nModels are available in both general-purpose and energy-domain-specific variants, with configurable context lengths of 96 or 512 time steps.",
+  "total_time_seconds": 5.528611457993975,
+  "num_tool_calls": 1,
+  "tool_call_sequence": [
+    "TSFMAgent/get_tsfm_models"
+  ],
+  "tokens_used": {
+    "prompt_tokens": 2894,
+    "completion_tokens": 252,
+    "total_tokens": 3146,
+    "num_llm_calls": 2
+  },
+  "tool_call_accuracy": 0.5,
+  "pytorch_cpu_time_ms": NaN,
+  "pytorch_cuda_time_ms": NaN,
+  "pytorch_memory_mb": NaN,
+  "success": true,
+  "error": null,
+  "tool_call_details": [
+    {
+      "step": 1,
+      "agent": "TSFMAgent",
+      "tool": "get_tsfm_models",
+      "duration_seconds": 0.42983212499530055,
+      "success": true
+    }
+  ]
+}
