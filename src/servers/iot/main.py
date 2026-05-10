@@ -1,12 +1,13 @@
-import os
 import logging
+import os
+from pathlib import Path
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel
 import couchdb3
 from dotenv import load_dotenv
-
+from cache.cache import Cache
 load_dotenv()
 
 # Setup logging — default WARNING so stderr stays quiet when used as MCP server;
@@ -33,6 +34,8 @@ except Exception as e:
 
 mcp = FastMCP("IoTAgent")
 
+_CACHE_FILE = Path(__file__).with_name("cache.json")
+_cache = Cache(str(_CACHE_FILE))
 # Static site as per original requirement
 SITES = ["MAIN"]
 
@@ -75,6 +78,9 @@ def get_asset_list() -> List[str]:
     if not db:
         return []
 
+    if _cache and _cache.get("asset_list"):
+        return _cache.get("asset_list")
+
     # Using a mango query to find unique asset_ids might be slow without an index,
     # but for this benchmark we'll query documents and unique them.
     # In a production environment, we'd use a CouchDB view.
@@ -84,6 +90,8 @@ def get_asset_list() -> List[str]:
             {"asset_id": {"$exists": True}}, fields=["asset_id"], limit=100000
         )
         assets = {doc["asset_id"] for doc in res["docs"] if "asset_id" in doc}
+        if _cache:
+            _cache.add("asset_list", sorted(list(assets)))
         return sorted(list(assets))
     except Exception as e:
         logger.error(f"Error fetching assets: {e}")
@@ -95,6 +103,9 @@ def get_sensor_list(asset_id: str) -> List[str]:
     if not db:
         return []
 
+    if _cache and _cache.get(f"sensor_list_{asset_id}"):
+        return _cache.get(f"sensor_list_{asset_id}")
+
     try:
         # Get one document for the asset to inspect keys
         res = db.find({"asset_id": asset_id}, limit=1)
@@ -105,6 +116,8 @@ def get_sensor_list(asset_id: str) -> List[str]:
         # Exclude metadata and standard fields
         exclude = {"_id", "_rev", "asset_id", "timestamp"}
         sensors = [key for key in doc.keys() if key not in exclude]
+        if _cache:
+            _cache.add(f"sensor_list_{asset_id}", sorted(sensors))
         return sorted(sensors)
     except Exception as e:
         logger.error(f"Error fetching sensors for {asset_id}: {e}")
@@ -114,16 +127,22 @@ def get_sensor_list(asset_id: str) -> List[str]:
 @mcp.tool()
 def sites() -> SitesResult:
     """Retrieves a list of sites. Each site is represented by a name."""
-    return SitesResult(sites=SITES)
+    temp = SitesResult(sites=SITES)
+    logger.info(f"Sites result: {temp}")
+    return temp
 
 
 @mcp.tool()
 def assets(site_name: str) -> Union[AssetsResult, ErrorResult]:
     """Returns a list of assets for a given site. Each asset includes an id and a name."""
     if site_name not in SITES:
+        logger.error(f"Unknown site requested: {site_name}")
         return ErrorResult(error=f"unknown site {site_name}")
 
+    logger.info(f"Assets called with site_name: {site_name}")
+
     asset_list = get_asset_list()
+    logger.info(f"Assets found for site {site_name}: {asset_list}")
     return AssetsResult(
         site_name=site_name,
         total_assets=len(asset_list),
@@ -135,13 +154,14 @@ def assets(site_name: str) -> Union[AssetsResult, ErrorResult]:
 @mcp.tool()
 def sensors(site_name: str, asset_id: str) -> Union[SensorsResult, ErrorResult]:
     """Lists the sensors available for a specified asset at a given site."""
+    logger.info(f"Sensors called with site_name: {site_name}, asset_id: {asset_id}")
     if site_name not in SITES:
+        logger.error(f"Unknown site requested: {site_name}")
         return ErrorResult(error=f"unknown site {site_name}")
-
     sensor_list = get_sensor_list(asset_id)
     if not sensor_list:
+        logger.error(f"Unknown asset ID requested: {asset_id}")
         return ErrorResult(error=f"unknown asset_id {asset_id} or no sensors found")
-
     return SensorsResult(
         site_name=site_name,
         asset_id=asset_id,

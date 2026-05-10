@@ -50,6 +50,8 @@ Rules:
 - Never use json_reader to re-read or cache results from prior steps — prior step results are available via {{step_N}} placeholders. json_reader is only for reading pre-existing configuration files on disk.
 - Dependencies use #S<N> notation (e.g., #S1, #S2). Use "None" if none.
 - Keep tasks specific and actionable.
+- For Tool "none" steps that list dependencies, #ExpectedOutput describes the artifact
+  to derive; the runtime extracts concrete values from prior results (not literal text).
 
 Question: {question}
 

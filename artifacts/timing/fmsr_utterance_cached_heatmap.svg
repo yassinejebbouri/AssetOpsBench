@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="528" height="962" viewBox="0 0 528 962">
+<style>
+text { font-family: Arial, Helvetica, sans-serif; fill: #111; }
+.title { font-size: 22px; font-weight: 500; }
+.axis { font-size: 17px; }
+.tick { font-size: 16px; }
+.cell-label { font-size: 15px; font-weight: 700; }
+.small { font-size: 14px; }
+</style>
+<rect width="100%" height="100%" fill="white"/>
+<text class="title" x="264.0" y="34" text-anchor="middle">Wall time heatmap with caching (lower = faster)</text>
+<text class="axis" x="207.0" y="90" text-anchor="middle">Cached</text>
+<text class="tick" x="74" y="126.8" text-anchor="end">101</text>
+<rect x="92" y="104" width="230" height="34" fill="#026938"/>
+<text class="cell-label" x="207.0" y="126.1" text-anchor="middle" fill="#f8f8f8">11.6s</text>
+<text class="tick" x="74" y="160.8" text-anchor="end">102</text>
+<rect x="92" y="138" width="230" height="34" fill="#046a39"/>
+<text class="cell-label" x="207.0" y="160.1" text-anchor="middle" fill="#f8f8f8">14.4s</text>
+<text class="tick" x="74" y="194.8" text-anchor="end">103</text>
+<rect x="92" y="172" width="230" height="34" fill="#006837"/>
+<text class="cell-label" x="207.0" y="194.1" text-anchor="middle" fill="#f8f8f8">9.6s</text>
+<text class="tick" x="74" y="228.8" text-anchor="end">104</text>
+<rect x="92" y="206" width="230" height="34" fill="#066c3a"/>
+<text class="cell-label" x="207.0" y="228.1" text-anchor="middle" fill="#f8f8f8">17.2s</text>
+<text class="tick" x="74" y="262.8" text-anchor="end">105</text>
+<rect x="92" y="240" width="230" height="34" fill="#046b39"/>
+<text class="cell-label" x="207.0" y="262.1" text-anchor="middle" fill="#f8f8f8">14.9s</text>
+<text class="tick" x="74" y="296.8" text-anchor="end">106</text>
+<rect x="92" y="274" width="230" height="34" fill="#066b3a"/>
+<text class="cell-label" x="207.0" y="296.1" text-anchor="middle" fill="#f8f8f8">16.5s</text>
+<text class="tick" x="74" y="330.8" text-anchor="end">107</text>
+<rect x="92" y="308" width="230" height="34" fill="#a50026"/>
+<text class="cell-label" x="207.0" y="330.1" text-anchor="middle" fill="#f8f8f8">624.9s</text>
+<text class="tick" x="74" y="364.8" text-anchor="end">108</text>
+<rect x="92" y="342" width="230" height="34" fill="#0e703e"/>
+<text class="cell-label" x="207.0" y="364.1" text-anchor="middle" fill="#f8f8f8">26.0s</text>
+<text class="tick" x="74" y="398.8" text-anchor="end">109</text>
+<rect x="92" y="376" width="230" height="34" fill="#107240"/>
+<text class="cell-label" x="207.0" y="398.1" text-anchor="middle" fill="#f8f8f8">29.4s</text>
+<text class="tick" x="74" y="432.8" text-anchor="end">110</text>
+<rect x="92" y="410" width="230" height="34" fill="#2d824f"/>
+<text class="cell-label" x="207.0" y="432.1" text-anchor="middle" fill="#f8f8f8">63.4s</text>
+<text class="tick" x="74" y="466.8" text-anchor="end">111</text>
+<rect x="92" y="444" width="230" height="34" fill="#4c9560"/>
+<text class="cell-label" x="207.0" y="466.1" text-anchor="middle" fill="#111">101.5s</text>
+<text class="tick" x="74" y="500.8" text-anchor="end">112</text>
+<rect x="92" y="478" width="230" height="34" fill="#0e703f"/>
+<text class="cell-label" x="207.0" y="500.1" text-anchor="middle" fill="#f8f8f8">26.7s</text>
+<text class="tick" x="74" y="534.8" text-anchor="end">113</text>
+<rect x="92" y="512" width="230" height="34" fill="#0e703e"/>
+<text class="cell-label" x="207.0" y="534.1" text-anchor="middle" fill="#f8f8f8">26.2s</text>
+<text class="tick" x="74" y="568.8" text-anchor="end">114</text>
+<rect x="92" y="546" width="230" height="34" fill="#056b3a"/>
+<text class="cell-label" x="207.0" y="568.1" text-anchor="middle" fill="#f8f8f8">15.8s</text>
+<text class="tick" x="74" y="602.8" text-anchor="end">115</text>
+<rect x="92" y="580" width="230" height="34" fill="#579b65"/>
+<text class="cell-label" x="207.0" y="602.1" text-anchor="middle" fill="#111">114.5s</text>
+<text class="tick" x="74" y="636.8" text-anchor="end">116</text>
+<rect x="92" y="614" width="230" height="34" fill="#0d703e"/>
+<text class="cell-label" x="207.0" y="636.1" text-anchor="middle" fill="#f8f8f8">25.3s</text>
+<text class="tick" x="74" y="670.8" text-anchor="end">117</text>
+<rect x="92" y="648" width="230" height="34" fill="#217b48"/>
+<text class="cell-label" x="207.0" y="670.1" text-anchor="middle" fill="#f8f8f8">48.9s</text>
+<text class="tick" x="74" y="704.8" text-anchor="end">118</text>
+<rect x="92" y="682" width="230" height="34" fill="#257e4b"/>
+<text class="cell-label" x="207.0" y="704.1" text-anchor="middle" fill="#f8f8f8">53.9s</text>
+<text class="tick" x="74" y="738.8" text-anchor="end">119</text>
+<rect x="92" y="716" width="230" height="34" fill="#117240"/>
+<text class="cell-label" x="207.0" y="738.1" text-anchor="middle" fill="#f8f8f8">29.7s</text>
+<text class="tick" x="74" y="772.8" text-anchor="end">120</text>
+<rect x="92" y="750" width="230" height="34" fill="#0c6f3d"/>
+<text class="cell-label" x="207.0" y="772.1" text-anchor="middle" fill="#f8f8f8">24.0s</text>
+<text class="tick" x="74" y="806.8" text-anchor="end">121</text>
+<rect x="92" y="784" width="230" height="34" fill="#157542"/>
+<text class="cell-label" x="207.0" y="806.1" text-anchor="middle" fill="#f8f8f8">35.5s</text>
+<text class="tick" x="74" y="840.8" text-anchor="end">122</text>
+<rect x="92" y="818" width="230" height="34" fill="#137341"/>
+<text class="cell-label" x="207.0" y="840.1" text-anchor="middle" fill="#f8f8f8">32.5s</text>
+<rect x="92" y="104" width="230" height="748" fill="none" stroke="#111" stroke-width="1.2"/>
+<text class="axis" transform="translate(24 478.0) rotate(-90)" text-anchor="middle">Scenario ID</text>
+<text class="axis" x="207.0" y="894" text-anchor="middle">Cached</text>
+<rect x="368" y="104.00" width="30" height="10.35" fill="#a50026"/>
+<rect x="368" y="113.47" width="30" height="10.35" fill="#a7062a"/>
+<rect x="368" y="122.94" width="30" height="10.35" fill="#aa0d2e"/>
+<rect x="368" y="132.41" width="30" height="10.35" fill="#ac1332"/>
+<rect x="368" y="141.87" width="30" height="10.35" fill="#ae1a35"/>
+<rect x="368" y="151.34" width="30" height="10.35" fill="#b02039"/>
+<rect x="368" y="160.81" width="30" height="10.35" fill="#b3273d"/>
+<rect x="368" y="170.28" width="30" height="10.35" fill="#b52d41"/>
+<rect x="368" y="179.75" width="30" height="10.35" fill="#b73445"/>
+<rect x="368" y="189.22" width="30" height="10.35" fill="#ba3a49"/>
+<rect x="368" y="198.68" width="30" height="10.35" fill="#bc414d"/>
+<rect x="368" y="208.15" width="30" height="10.35" fill="#be4751"/>
+<rect x="368" y="217.62" width="30" height="10.35" fill="#c04d54"/>
+<rect x="368" y="227.09" width="30" height="10.35" fill="#c35458"/>
+<rect x="368" y="236.56" width="30" height="10.35" fill="#c55a5c"/>
+<rect x="368" y="246.03" width="30" height="10.35" fill="#c76160"/>
+<rect x="368" y="255.49" width="30" height="10.35" fill="#c96764"/>
+<rect x="368" y="264.96" width="30" height="10.35" fill="#cc6e68"/>
+<rect x="368" y="274.43" width="30" height="10.35" fill="#ce746c"/>
+<rect x="368" y="283.90" width="30" height="10.35" fill="#d07b70"/>
+<rect x="368" y="293.37" width="30" height="10.35" fill="#d38173"/>
+<rect x="368" y="302.84" width="30" height="10.35" fill="#d58877"/>
+<rect x="368" y="312.30" width="30" height="10.35" fill="#d78e7b"/>
+<rect x="368" y="321.77" width="30" height="10.35" fill="#d9947f"/>
+<rect x="368" y="331.24" width="30" height="10.35" fill="#dc9b83"/>
+<rect x="368" y="340.71" width="30" height="10.35" fill="#dea187"/>
+<rect x="368" y="350.18" width="30" height="10.35" fill="#e0a88b"/>
+<rect x="368" y="359.65" width="30" height="10.35" fill="#e3ae8f"/>
+<rect x="368" y="369.11" width="30" height="10.35" fill="#e5b592"/>
+<rect x="368" y="378.58" width="30" height="10.35" fill="#e7bb96"/>
+<rect x="368" y="388.05" width="30" height="10.35" fill="#e9c29a"/>
+<rect x="368" y="397.52" width="30" height="10.35" fill="#ecc89e"/>
+<rect x="368" y="406.99" width="30" height="10.35" fill="#eecfa2"/>
+<rect x="368" y="416.46" width="30" height="10.35" fill="#f0d5a6"/>
+<rect x="368" y="425.92" width="30" height="10.35" fill="#f2dbaa"/>
+<rect x="368" y="435.39" width="30" height="10.35" fill="#f5e2ae"/>
+<rect x="368" y="444.86" width="30" height="10.35" fill="#f7e8b1"/>
+<rect x="368" y="454.33" width="30" height="10.35" fill="#f9efb5"/>
+<rect x="368" y="463.80" width="30" height="10.35" fill="#fcf5b9"/>
+<rect x="368" y="473.27" width="30" height="10.35" fill="#fefcbd"/>
+<rect x="368" y="482.73" width="30" height="10.35" fill="#fcfdbd"/>
+<rect x="368" y="492.20" width="30" height="10.35" fill="#f5f9ba"/>
+<rect x="368" y="501.67" width="30" height="10.35" fill="#eff5b6"/>
+<rect x="368" y="511.14" width="30" height="10.35" fill="#e8f2b3"/>
+<rect x="368" y="520.61" width="30" height="10.35" fill="#e2eeb0"/>
+<rect x="368" y="530.08" width="30" height="10.35" fill="#dbeaac"/>
+<rect x="368" y="539.54" width="30" height="10.35" fill="#d5e6a9"/>
+<rect x="368" y="549.01" width="30" height="10.35" fill="#cfe2a5"/>
+<rect x="368" y="558.48" width="30" height="10.35" fill="#c8dfa2"/>
+<rect x="368" y="567.95" width="30" height="10.35" fill="#c2db9e"/>
+<rect x="368" y="577.42" width="30" height="10.35" fill="#bbd79b"/>
+<rect x="368" y="586.89" width="30" height="10.35" fill="#b5d397"/>
+<rect x="368" y="596.35" width="30" height="10.35" fill="#aecf94"/>
+<rect x="368" y="605.82" width="30" height="10.35" fill="#a8cb91"/>
+<rect x="368" y="615.29" width="30" height="10.35" fill="#a1c88d"/>
+<rect x="368" y="624.76" width="30" height="10.35" fill="#9bc48a"/>
+<rect x="368" y="634.23" width="30" height="10.35" fill="#94c086"/>
+<rect x="368" y="643.70" width="30" height="10.35" fill="#8ebc83"/>
+<rect x="368" y="653.16" width="30" height="10.35" fill="#88b87f"/>
+<rect x="368" y="662.63" width="30" height="10.35" fill="#81b47c"/>
+<rect x="368" y="672.10" width="30" height="10.35" fill="#7bb178"/>
+<rect x="368" y="681.57" width="30" height="10.35" fill="#74ad75"/>
+<rect x="368" y="691.04" width="30" height="10.35" fill="#6ea972"/>
+<rect x="368" y="700.51" width="30" height="10.35" fill="#67a56e"/>
+<rect x="368" y="709.97" width="30" height="10.35" fill="#61a16b"/>
+<rect x="368" y="719.44" width="30" height="10.35" fill="#5a9e67"/>
+<rect x="368" y="728.91" width="30" height="10.35" fill="#549a64"/>
+<rect x="368" y="738.38" width="30" height="10.35" fill="#4d9660"/>
+<rect x="368" y="747.85" width="30" height="10.35" fill="#47925d"/>
+<rect x="368" y="757.32" width="30" height="10.35" fill="#418e59"/>
+<rect x="368" y="766.78" width="30" height="10.35" fill="#3a8a56"/>
+<rect x="368" y="776.25" width="30" height="10.35" fill="#348753"/>
+<rect x="368" y="785.72" width="30" height="10.35" fill="#2d834f"/>
+<rect x="368" y="795.19" width="30" height="10.35" fill="#277f4c"/>
+<rect x="368" y="804.66" width="30" height="10.35" fill="#207b48"/>
+<rect x="368" y="814.13" width="30" height="10.35" fill="#1a7745"/>
+<rect x="368" y="823.59" width="30" height="10.35" fill="#137341"/>
+<rect x="368" y="833.06" width="30" height="10.35" fill="#0d703e"/>
+<rect x="368" y="842.53" width="30" height="10.35" fill="#066c3a"/>
+<rect x="368" y="852.00" width="30" height="10.35" fill="#006837"/>
+<line x1="398" x2="405" y1="852.0" y2="852.0" stroke="#111"/>
+<text class="small" x="410" y="857.0">10</text>
+<line x1="398" x2="405" y1="478.0" y2="478.0" stroke="#111"/>
+<text class="small" x="410" y="483.0">317</text>
+<line x1="398" x2="405" y1="104.0" y2="104.0" stroke="#111"/>
+<text class="small" x="410" y="109.0">625</text>
+<rect x="368" y="104" width="30" height="748" fill="none" stroke="#111" stroke-width="1"/>
+<text class="axis" transform="translate(470 478.0) rotate(-90)" text-anchor="middle">Wall time (s)</text>
+</svg>
