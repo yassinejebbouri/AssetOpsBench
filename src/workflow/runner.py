@@ -119,10 +119,11 @@ class PlanExecuteRunner:
         server_paths: dict[str, Path | str] | None = None,
         prune_fmsr: bool = False,
         prune_threshold: float | None = None,
+        planner_topology: str = "",
     ) -> None:
         from .pruner import DEFAULT_THRESHOLD
         self._llm = llm
-        self._planner = Planner(llm)
+        self._planner = Planner(llm, topology_instructions=planner_topology)
         self._executor = Executor(
             llm,
             server_paths,

@@ -15,6 +15,7 @@ from .models import Plan, PlanStep
 _PLAN_PROMPT = """\
 You are a planning assistant for industrial asset operations and maintenance.
 
+{topology}
 Decompose the question below into a sequence of subtasks. For each subtask,
 assign an agent and select the exact tool to call with its arguments.
 
@@ -42,6 +43,7 @@ Output format — one block per step, exactly:
 
 Rules:
 - Agent and tool names must exactly match those listed above. No comments, no parentheses, no extra text after the name.
+- Every #AgentN must be one of the agent names listed — never "none", "None", or empty.
 - #Args must be a valid JSON object on a single line. Never use indexing like {{step_N[0]}} or attribute access like {{step_N[0].id}}.
 - Use {{step_N}} as a placeholder for ANY value that comes from a prior step — never hardcode IDs, names, or values that were returned by a tool (e.g. never write "Chiller_6_id", always write "{{step_N}}").
 - Every step MUST call a real tool. Never set Agent or Tool to "none" — omit the step entirely if no tool call is needed.
@@ -170,9 +172,15 @@ def parse_plan(raw: str) -> Plan:
 class Planner:
     """Decomposes a question into a structured execution plan using an LLM."""
 
-    def __init__(self, llm: LLMBackend, db_context: dict | None = None) -> None:
+    def __init__(
+        self,
+        llm: LLMBackend,
+        db_context: dict | None = None,
+        topology_instructions: str = "",
+    ) -> None:
         self._llm = llm
         self._db_context = db_context or {}
+        self._topology = topology_instructions.strip()
 
     def generate_plan(
         self,
@@ -200,7 +208,9 @@ class Planner:
             if context
             else ""
         )
+        topo_block = (self._topology + "\n\n" if self._topology else "")
         prompt = _PLAN_PROMPT.format(
+            topology=topo_block,
             agents=agents_text,
             context_block=context_block,
             question=question,

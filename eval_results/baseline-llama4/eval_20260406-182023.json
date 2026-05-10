@@ -1,0 +1,561 @@
+{
+  "run_id": "20260406-182023",
+  "run_name": "baseline-llama4",
+  "timestamp": "2026-04-06T18:20:23.226207+00:00",
+  "config": {
+    "model_id": "watsonx/meta-llama/llama-4-maverick-17b-128e-instruct-fp8",
+    "judge_model_id": "watsonx/meta-llama/llama-4-maverick-17b-128e-instruct-fp8",
+    "gate_threshold": 0.5,
+    "skip_judge": false,
+    "prompt_variant": "default",
+    "scenario_types": null,
+    "scenario_ids": null,
+    "limit": 3,
+    "scenario_source_dir": "src/tmp/meta_agent/scenarios/",
+    "scenario_files": [
+      "end2end_utterance.json"
+    ],
+    "total_scenarios_in_source": 3
+  },
+  "summary": {
+    "total_scenarios": 3,
+    "gate_threshold": 0.5,
+    "structural": {
+      "plan_parsed_rate": 1.0,
+      "agent_valid_rate": 0.6667,
+      "tool_known_rate": 1.0,
+      "null_tool_rate": 1.0,
+      "any_step_failed_rate": 0.3333,
+      "avg_execution_success_rate": 0.8519,
+      "avg_plan_steps": 8.3333,
+      "gate_pass_rate": 0.6667,
+      "gate_passed_count": 2,
+      "crashed_count": 0,
+      "avg_latency_s": 31.7737
+    },
+    "semantic": {
+      "judged_count": 2,
+      "judge_error_count": 0,
+      "overall_pass_rate": 0.0,
+      "task_completion_rate": 0.0,
+      "data_retrieval_accuracy_rate": 0.0,
+      "generalized_result_verification_rate": 0.0,
+      "agent_sequence_correct_rate": 0.0,
+      "clarity_and_justification_rate": 1.0,
+      "hallucinations_rate": 0.0
+    },
+    "by_type": {
+      "(none)": {
+        "count": 3,
+        "plan_parsed_rate": 1.0,
+        "agent_valid_rate": 0.6667,
+        "exec_success_rate": 0.8519,
+        "gate_pass_rate": 0.6667,
+        "avg_latency_s": 31.77,
+        "judged_count": 2,
+        "judge_overall_pass_rate": 0.0,
+        "agent_sequence_correct_rate": 0.0
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": 501,
+      "type": "",
+      "deterministic": false,
+      "text": "Is there any anomaly detected in Chiller 6's Tonnage in the week of 2020-04-27 at the MAIN site?",
+      "characteristic_form": "The expected response should confirm the successful execution of all required actions while ensuring the correct variables, including the asset (Chiller 6), location (MAIN), and time range (week of 2020-04-27), were used for data retrieval and analysis. It should specify that IoTAgent was called to request and download the data, and TSFMAgent was properly utilized to perform Time Series anomaly detection on the Tonnage parameter. The response must also verify that the data was accurately stored in the designated file location, and that the analysis results were saved to a new file. Additionally, the response should explicitly confirm the detection of anomalies in Chiller 6's Tonnage during the specified timeframe at the MAIN site, as these anomalies were anticipated.",
+      "source_file": "end2end_utterance.json",
+      "stage1": {
+        "scenario_id": 501,
+        "scenario_type": "",
+        "deterministic": false,
+        "question": "Is there any anomaly detected in Chiller 6's Tonnage in the week of 2020-04-27 at the MAIN site?",
+        "model_id": "watsonx/meta-llama/llama-4-maverick-17b-128e-instruct-fp8",
+        "run_name": "baseline-llama4",
+        "plan_parsed": true,
+        "plan_step_count": 9,
+        "all_agents_valid": false,
+        "agent_hallucination_count": 4,
+        "all_tools_known": true,
+        "tool_hallucination_count": 0,
+        "null_tool_count": 4,
+        "steps_succeeded": 5,
+        "steps_failed": 4,
+        "execution_success_rate": 0.5555555555555556,
+        "any_step_failed": true,
+        "tool_sequence": [
+          "IoTAgent.sites",
+          "IoTAgent.assets",
+          "IoTAgent.sensors",
+          "IoTAgent.history",
+          "TSFMAgent.run_integrated_tsad"
+        ],
+        "steps": [
+          {
+            "step_number": 1,
+            "agent": "IoTAgent",
+            "tool": "sites",
+            "tool_args": {},
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 2,
+            "agent": "IoTAgent",
+            "tool": "assets",
+            "tool_args": {
+              "site_name": "MAIN"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 3,
+            "agent": "none",
+            "tool": "none",
+            "tool_args": {},
+            "success": false,
+            "error": "Unknown agent 'none'. Registered agents: ['IoTAgent', 'Utilities', 'FMSRAgent', 'TSFMAgent']",
+            "agent_valid": false,
+            "tool_non_null": false,
+            "tool_known": true
+          },
+          {
+            "step_number": 4,
+            "agent": "IoTAgent",
+            "tool": "sensors",
+            "tool_args": {
+              "site_name": "MAIN",
+              "asset_id": "{step_3}"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 5,
+            "agent": "IoTAgent",
+            "tool": "history",
+            "tool_args": {
+              "site_name": "MAIN",
+              "asset_id": "{step_3}",
+              "start": "2020-04-27",
+              "final": "2020-05-04"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 6,
+            "agent": "none",
+            "tool": "none",
+            "tool_args": {},
+            "success": false,
+            "error": "Unknown agent 'none'. Registered agents: ['IoTAgent', 'Utilities', 'FMSRAgent', 'TSFMAgent']",
+            "agent_valid": false,
+            "tool_non_null": false,
+            "tool_known": true
+          },
+          {
+            "step_number": 7,
+            "agent": "none",
+            "tool": "none",
+            "tool_args": {},
+            "success": false,
+            "error": "Unknown agent 'none'. Registered agents: ['IoTAgent', 'Utilities', 'FMSRAgent', 'TSFMAgent']",
+            "agent_valid": false,
+            "tool_non_null": false,
+            "tool_known": true
+          },
+          {
+            "step_number": 8,
+            "agent": "TSFMAgent",
+            "tool": "run_integrated_tsad",
+            "tool_args": {
+              "dataset_path": "{step_7}",
+              "timestamp_column": "timestamp",
+              "target_columns": [
+                "{step_6}"
+              ],
+              "model_checkpoint": "ttm_96_28",
+              "false_alarm": 0.05,
+              "ad_model_type": "timeseries_conformal",
+              "n_calibration": 0.2,
+              "conditional_columns": null,
+              "id_columns": null,
+              "frequency_sampling": "",
+              "autoregressive_modeling": true
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 9,
+            "agent": "none",
+            "tool": "none",
+            "tool_args": {},
+            "success": false,
+            "error": "Unknown agent 'none'. Registered agents: ['IoTAgent', 'Utilities', 'FMSRAgent', 'TSFMAgent']",
+            "agent_valid": false,
+            "tool_non_null": false,
+            "tool_known": true
+          }
+        ],
+        "answer": "The task execution was unsuccessful due to multiple errors, including connection issues with the IoTAgent, unknown agents, and missing dependencies for the TSFMAgent. As a result, it is not possible to determine if there were any anomalies detected in Chiller 6's Tonnage at the MAIN site for the week of 2020-04-27.",
+        "overall_success": false,
+        "latency_s": 26.0577399157919,
+        "error": null
+      },
+      "stage2": null,
+      "stage2_skipped_reason": "gate_not_met"
+    },
+    {
+      "id": 502,
+      "type": "",
+      "deterministic": false,
+      "text": "What is the forecast for 'Chiller 9 Condenser Water Flow' in the week of 2020-04-27 based on data from the MAIN site?",
+      "characteristic_form": "The expected response should confirm the successful execution of all required actions, ensuring that the correct variables, including the asset ('Chiller 9'), location (MAIN), and time range (week of 2020-04-27), were used for data retrieval and analysis. It should specify that the agent identified the sensors for the asset and site, then located the specific sensor, 'Chiller 9 Condenser Water Flow'. The response must confirm that the agent retrieved the time-series data for this sensor within the specified timeframe and provided the correct file path where the data is stored. Additionally, the response should verify that TSFMAgent was called to analyze the data and perform forecasting using the specified model checkpoint 'ttm_96_28'. The response should confirm that the agent successfully read the JSON file, performed the time-series forecasting, and stored the results in the designated file path.",
+      "source_file": "end2end_utterance.json",
+      "stage1": {
+        "scenario_id": 502,
+        "scenario_type": "",
+        "deterministic": false,
+        "question": "What is the forecast for 'Chiller 9 Condenser Water Flow' in the week of 2020-04-27 based on data from the MAIN site?",
+        "model_id": "watsonx/meta-llama/llama-4-maverick-17b-128e-instruct-fp8",
+        "run_name": "baseline-llama4",
+        "plan_parsed": true,
+        "plan_step_count": 8,
+        "all_agents_valid": true,
+        "agent_hallucination_count": 0,
+        "all_tools_known": true,
+        "tool_hallucination_count": 0,
+        "null_tool_count": 1,
+        "steps_succeeded": 8,
+        "steps_failed": 0,
+        "execution_success_rate": 1.0,
+        "any_step_failed": false,
+        "tool_sequence": [
+          "IoTAgent.sites",
+          "IoTAgent.assets",
+          "IoTAgent.sensors",
+          "IoTAgent.history",
+          "Utilities.json_reader",
+          "TSFMAgent.run_tsfm_forecasting",
+          "Utilities.json_reader"
+        ],
+        "steps": [
+          {
+            "step_number": 1,
+            "agent": "IoTAgent",
+            "tool": "sites",
+            "tool_args": {},
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 2,
+            "agent": "IoTAgent",
+            "tool": "assets",
+            "tool_args": {
+              "site_name": "MAIN"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 3,
+            "agent": "IoTAgent",
+            "tool": "none",
+            "tool_args": {},
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": false,
+            "tool_known": true
+          },
+          {
+            "step_number": 4,
+            "agent": "IoTAgent",
+            "tool": "sensors",
+            "tool_args": {
+              "site_name": "MAIN",
+              "asset_id": "{step_3}"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 5,
+            "agent": "IoTAgent",
+            "tool": "history",
+            "tool_args": {
+              "site_name": "MAIN",
+              "asset_id": "{step_3}",
+              "start": "2020-04-20",
+              "final": "2020-05-04"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 6,
+            "agent": "Utilities",
+            "tool": "json_reader",
+            "tool_args": {
+              "file_name": "{step_5}"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 7,
+            "agent": "TSFMAgent",
+            "tool": "run_tsfm_forecasting",
+            "tool_args": {
+              "dataset_path": "{step_5}",
+              "timestamp_column": "timestamp",
+              "target_columns": [
+                "Chiller 9 Condenser Water Flow"
+              ],
+              "model_checkpoint": "ttm_96_28",
+              "forecast_horizon": 7
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 8,
+            "agent": "Utilities",
+            "tool": "json_reader",
+            "tool_args": {
+              "file_name": "{step_7}"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          }
+        ],
+        "answer": "The task to forecast 'Chiller 9 Condenser Water Flow' for the week of 2020-04-27 at the MAIN site was not completed due to multiple errors encountered during the execution of the steps. The errors were related to connection issues, missing required fields in the input data, and the inability to retrieve historical data and run the forecasting model. Therefore, the forecast for 'Chiller 9 Condenser Water Flow' for the specified week is unavailable.",
+        "overall_success": true,
+        "latency_s": 47.83764087501913,
+        "error": null
+      },
+      "stage2": {
+        "task_completion": false,
+        "data_retrieval_accuracy": false,
+        "generalized_result_verification": false,
+        "agent_sequence_correct": false,
+        "clarity_and_justification": true,
+        "hallucinations": false,
+        "suggestions": "The agent's response indicates multiple errors, including connection issues and missing required fields. Rectify these by ensuring the IoTAgent can connect to the required services and that all necessary fields are provided in the input data. Verify the correct sequence and execution of agents.",
+        "judge_error": null
+      },
+      "stage2_skipped_reason": null
+    },
+    {
+      "id": 503,
+      "type": "",
+      "deterministic": false,
+      "text": "Have there been any anomalies in Chiller 6's Tonnage in the week of 2020-04-27 at MAIN?",
+      "characteristic_form": "The expected response should confirm the successful execution of all required actions, ensuring that the correct variables, including the asset ('Chiller 6'), location (MAIN), and time range (week of 2020-04-27), were used for data retrieval and analysis. It should specify that the agent called IoTAgent to request and download the Chiller 6 Tonnage data for the specified week, and that the data was stored correctly. The response must also confirm that TSFMAgent was used to analyze the data for anomalies, and that the analysis results were saved in a separate file. Additionally, it should confirm that the dataset contained mote than 400 records and that around 20 anomalies were detected. Finally, the response must be clear, justified, and free from hallucinations, ensuring that all actions were executed accurately and anomalies in Chiller 6's Tonnage during the specified timeframe at MAIN were detected as expected.",
+      "source_file": "end2end_utterance.json",
+      "stage1": {
+        "scenario_id": 503,
+        "scenario_type": "",
+        "deterministic": false,
+        "question": "Have there been any anomalies in Chiller 6's Tonnage in the week of 2020-04-27 at MAIN?",
+        "model_id": "watsonx/meta-llama/llama-4-maverick-17b-128e-instruct-fp8",
+        "run_name": "baseline-llama4",
+        "plan_parsed": true,
+        "plan_step_count": 8,
+        "all_agents_valid": true,
+        "agent_hallucination_count": 0,
+        "all_tools_known": true,
+        "tool_hallucination_count": 0,
+        "null_tool_count": 2,
+        "steps_succeeded": 8,
+        "steps_failed": 0,
+        "execution_success_rate": 1.0,
+        "any_step_failed": false,
+        "tool_sequence": [
+          "IoTAgent.assets",
+          "IoTAgent.history",
+          "IoTAgent.sensors",
+          "FMSRAgent.get_failure_modes",
+          "FMSRAgent.get_failure_mode_sensor_mapping",
+          "TSFMAgent.run_integrated_tsad"
+        ],
+        "steps": [
+          {
+            "step_number": 1,
+            "agent": "IoTAgent",
+            "tool": "assets",
+            "tool_args": {
+              "site_name": "MAIN"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 2,
+            "agent": "IoTAgent",
+            "tool": "none",
+            "tool_args": {},
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": false,
+            "tool_known": true
+          },
+          {
+            "step_number": 3,
+            "agent": "IoTAgent",
+            "tool": "history",
+            "tool_args": {
+              "site_name": "MAIN",
+              "asset_id": "{step_2}",
+              "start": "2020-04-27",
+              "final": "2020-05-04"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 4,
+            "agent": "IoTAgent",
+            "tool": "sensors",
+            "tool_args": {
+              "site_name": "MAIN",
+              "asset_id": "{step_2}"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 5,
+            "agent": "FMSRAgent",
+            "tool": "get_failure_modes",
+            "tool_args": {
+              "asset_name": "Chiller 6"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 6,
+            "agent": "FMSRAgent",
+            "tool": "get_failure_mode_sensor_mapping",
+            "tool_args": {
+              "asset_name": "Chiller 6",
+              "failure_modes": "{step_5}",
+              "sensors": "{step_4}"
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 7,
+            "agent": "TSFMAgent",
+            "tool": "run_integrated_tsad",
+            "tool_args": {
+              "dataset_path": "{step_3}",
+              "timestamp_column": "timestamp",
+              "target_columns": [
+                "Tonnage"
+              ],
+              "model_checkpoint": "ttm_96_28",
+              "false_alarm": 0.05,
+              "ad_model_type": "timeseries_conformal",
+              "n_calibration": 0.2,
+              "conditional_columns": null,
+              "id_columns": null,
+              "frequency_sampling": "15_minutes",
+              "autoregressive_modeling": true
+            },
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": true,
+            "tool_known": true
+          },
+          {
+            "step_number": 8,
+            "agent": "TSFMAgent",
+            "tool": "none",
+            "tool_args": {},
+            "success": true,
+            "error": null,
+            "agent_valid": true,
+            "tool_non_null": false,
+            "tool_known": true
+          }
+        ],
+        "answer": "Unfortunately, due to connection errors and validation errors in the step-by-step execution, the task was unable to retrieve the necessary data to determine if there were any anomalies in Chiller 6's Tonnage during the week of 2020-04-27 at MAIN. Specifically, the required historical sensor data for Chiller 6 was not retrieved due to connection issues, and subsequent steps failed due to validation errors. Therefore, it is not possible to provide a definitive answer to the original question.",
+        "overall_success": true,
+        "latency_s": 21.425794541835785,
+        "error": null
+      },
+      "stage2": {
+        "task_completion": false,
+        "data_retrieval_accuracy": false,
+        "generalized_result_verification": false,
+        "agent_sequence_correct": false,
+        "clarity_and_justification": true,
+        "hallucinations": false,
+        "suggestions": "The agent's response was hindered by connection errors and validation errors. To rectify this, ensure that the connection to the data source is stable and that the input to the tools is validated properly. Additionally, the agent should handle such errors gracefully by either retrying the operation or providing a meaningful error message instead of failing abruptly.",
+        "judge_error": null
+      },
+      "stage2_skipped_reason": null
+    }
+  ]
+}
