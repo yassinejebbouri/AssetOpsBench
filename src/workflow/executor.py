@@ -176,7 +176,6 @@ class Executor:
                 resolved_args = step.tool_args
 
             response = await _call_tool(server_path, step.tool, resolved_args)
-            print(f"Response for step {step.step_number}: {response}")
             return StepResult(
                 step_number=step.step_number,
                 task=step.task,
@@ -432,7 +431,6 @@ async def _call_tool(server_path: Path | str, tool_name: str, args: dict) -> str
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.call_tool(tool_name, args)
-            print(f"Result for tool {tool_name} with args {args}: {result}")
             return _extract_content(result.content)
 
 

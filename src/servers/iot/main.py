@@ -1,12 +1,13 @@
-import os
 import logging
+import os
+from pathlib import Path
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel
 import couchdb3
 from dotenv import load_dotenv
-
+from cache.cache import Cache
 load_dotenv()
 
 # Setup logging — default WARNING so stderr stays quiet when used as MCP server;
@@ -33,6 +34,8 @@ except Exception as e:
 
 mcp = FastMCP("IoTAgent")
 
+_CACHE_FILE = Path(__file__).with_name("cache.json")
+_cache = Cache(str(_CACHE_FILE))
 # Static site as per original requirement
 SITES = ["MAIN"]
 
@@ -75,6 +78,9 @@ def get_asset_list() -> List[str]:
     if not db:
         return []
 
+    if _cache and _cache.get("asset_list"):
+        return _cache.get("asset_list")
+
     # Using a mango query to find unique asset_ids might be slow without an index,
     # but for this benchmark we'll query documents and unique them.
     # In a production environment, we'd use a CouchDB view.
@@ -84,6 +90,8 @@ def get_asset_list() -> List[str]:
             {"asset_id": {"$exists": True}}, fields=["asset_id"], limit=100000
         )
         assets = {doc["asset_id"] for doc in res["docs"] if "asset_id" in doc}
+        if _cache:
+            _cache.add("asset_list", sorted(list(assets)))
         return sorted(list(assets))
     except Exception as e:
         logger.error(f"Error fetching assets: {e}")
@@ -95,6 +103,9 @@ def get_sensor_list(asset_id: str) -> List[str]:
     if not db:
         return []
 
+    if _cache and _cache.get(f"sensor_list_{asset_id}"):
+        return _cache.get(f"sensor_list_{asset_id}")
+
     try:
         # Get one document for the asset to inspect keys
         res = db.find({"asset_id": asset_id}, limit=1)
@@ -105,6 +116,8 @@ def get_sensor_list(asset_id: str) -> List[str]:
         # Exclude metadata and standard fields
         exclude = {"_id", "_rev", "asset_id", "timestamp"}
         sensors = [key for key in doc.keys() if key not in exclude]
+        if _cache:
+            _cache.add(f"sensor_list_{asset_id}", sorted(sensors))
         return sorted(sensors)
     except Exception as e:
         logger.error(f"Error fetching sensors for {asset_id}: {e}")

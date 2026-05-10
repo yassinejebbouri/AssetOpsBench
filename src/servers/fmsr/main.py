@@ -25,6 +25,7 @@ import yaml
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel
+from cache.cache import Cache
 
 load_dotenv()
 
@@ -108,10 +109,12 @@ def _build_llm():
 try:
     _llm = _build_llm()
     _llm_available = True
+    _cache = Cache(str(Path(__file__).with_name("cache.json")))
 except Exception as _e:
     logger.warning("LLM unavailable (FMSR will use curated data only): %s", _e)
     _llm = None
     _llm_available = False
+    _cache = None
 
 
 # ── LLM call helpers with retry ───────────────────────────────────────────────
@@ -188,6 +191,12 @@ def get_failure_modes(asset_name: str) -> Union[FailureModesResult, ErrorResult]
     if not asset_key or asset_key == "none":
         return ErrorResult(error="asset_name is required")
 
+    if _cache and _cache.get(asset_key):
+        return FailureModesResult(
+            asset_name=asset_name,
+            failure_modes=_cache.get(asset_key),
+        )
+
     if asset_key in _ASSET_FAILURE_MODES:
         return FailureModesResult(
             asset_name=asset_name,
@@ -199,6 +208,8 @@ def get_failure_modes(asset_name: str) -> Union[FailureModesResult, ErrorResult]
 
     try:
         result = _call_asset2fm(asset_name)
+        if _cache:
+            _cache.add(asset_key, result)
         return FailureModesResult(asset_name=asset_name, failure_modes=result)
     except Exception as exc:
         logger.error("_call_asset2fm failed: %s", exc)
@@ -231,26 +242,36 @@ def get_failure_mode_sensor_mapping(
     full_relevancy: List[RelevancyEntry] = []
     fm2sensor: Dict[str, List[str]] = {}
     sensor2fm: Dict[str, List[str]] = {}
+    pending_cache_entries: dict[str, RelevancyEntry] = {}
 
     try:
         for s in sensors:
             for fm in failure_modes:
-                gen = _call_relevancy(asset_name, fm, s)
-                entry = RelevancyEntry(
-                    asset_name=asset_name,
-                    failure_mode=fm,
-                    sensor=s,
-                    relevancy_answer=gen["answer"],
-                    relevancy_reason=gen["reason"],
-                    temporal_behavior=gen["temporal_behavior"],
-                )
+                cache_key = f"{asset_name}_{fm}_{s}"
+                if _cache and _cache.get(cache_key):
+                    entry = RelevancyEntry(**_cache.get(cache_key))
+                else:
+                    gen = _call_relevancy(asset_name, fm, s)
+                    entry = RelevancyEntry(
+                        asset_name=asset_name,
+                        failure_mode=fm,
+                        sensor=s,
+                        relevancy_answer=gen["answer"],
+                        relevancy_reason=gen["reason"],
+                        temporal_behavior=gen["temporal_behavior"],
+                    )
+                    if _cache:
+                        pending_cache_entries[cache_key] = entry
                 full_relevancy.append(entry)
-                if "yes" in gen["answer"].lower():
+                if "yes" in entry.relevancy_answer.lower():
                     fm2sensor.setdefault(fm, []).append(s)
                     sensor2fm.setdefault(s, []).append(fm)
     except Exception as exc:
         logger.error("_call_relevancy failed: %s", exc)
         return ErrorResult(error=str(exc))
+
+    if _cache and pending_cache_entries:
+        _cache.add_many(pending_cache_entries)
 
     return FailureModeSensorMappingResult(
         metadata=MappingMetadata(
