@@ -21,7 +21,8 @@ from pathlib import Path
 from typing import Any
 
 from llm import LLMBackend
-from .models import Plan, PlanStep, StepResult
+from .models import Plan, PlanStep, StepResult, HardwareMetrics
+from .profiler import HardwareProfiler
 from .pruner import prune_fmsr_inputs, DEFAULT_THRESHOLD
 
 _log = logging.getLogger(__name__)
@@ -126,7 +127,9 @@ class Executor:
            them from prior step results.
         4. Call the tool and return its result.
         """
-
+        # Check tool first: if the planner says no tool is needed the agent field
+        # is irrelevant (it may be "none" / empty) so we return before even
+        # trying to look up the server path.
         if not step.tool or step.tool.lower() in ("none", "null"):
             return StepResult(
                 step_number=step.step_number,
@@ -170,7 +173,6 @@ class Executor:
             ):
                 fms = resolved_args.get("failure_modes", [])
                 sss = resolved_args.get("sensors", [])
-                # arg-resolver may hand back a JSON string rather than a list
                 if isinstance(fms, str):
                     try:
                         fms = json.loads(fms)
@@ -205,7 +207,13 @@ class Executor:
                     )
 
             t0 = time.perf_counter()
-            response = await _call_tool(server_path, step.tool, resolved_args)
+            with HardwareProfiler(
+                server=step.agent,
+                tool=step.tool,
+                scenario_id=question[:60],
+                orchestration="mcp",
+            ) as prof:
+                response = await _call_tool(server_path, step.tool, resolved_args)
             wall_s = round(time.perf_counter() - t0, 4)
 
             return StepResult(
@@ -217,6 +225,14 @@ class Executor:
                 tool_args=resolved_args,
                 wall_s=wall_s,
                 metadata=step_metadata,
+                hardware=HardwareMetrics(
+                    wall_time_s=prof.wall_time_s,
+                    cpu_percent_peak=prof.cpu_percent_peak,
+                    ram_mb_start=prof.ram_mb_start,
+                    ram_mb_peak=prof.ram_mb_peak,
+                    ram_mb_end=prof.ram_mb_end,
+                    io_read_bytes=prof.io_read_bytes,
+                ),
             )
         except Exception as exc:  # noqa: BLE001
             return StepResult(
