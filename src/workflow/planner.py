@@ -28,7 +28,7 @@ Output format — one block per step, exactly:
 
 #Task1: <task description>
 #Agent1: <exact agent name>
-#Tool1: <exact tool name, or "none" if no tool call is needed>
+#Tool1: <exact tool name>
 #Args1: <JSON object of tool arguments, e.g. {{"site_name": "MAIN"}}>
 #Dependency1: None
 #ExpectedOutput1: <what this step should produce>
@@ -41,9 +41,13 @@ Output format — one block per step, exactly:
 #ExpectedOutput2: <what this step should produce>
 
 Rules:
-- Agent and tool names must exactly match those listed above.
-- #Args must be a valid JSON object on a single line.
-- Use {{step_N}} as a placeholder when an argument depends on step N's result.
+- Agent and tool names must exactly match those listed above. No comments, no parentheses, no extra text after the name.
+- #Args must be a valid JSON object on a single line. Never use indexing like {{step_N[0]}} or attribute access like {{step_N[0].id}}.
+- Use {{step_N}} as a placeholder for ANY value that comes from a prior step — never hardcode IDs, names, or values that were returned by a tool (e.g. never write "Chiller_6_id", always write "{{step_N}}").
+- Every step MUST call a real tool. Never set Agent or Tool to "none" — omit the step entirely if no tool call is needed.
+- Never call the same tool twice for the same purpose — reuse results from earlier steps via {{step_N}}.
+- site_name is always "MAIN". asset_id must come from the assets() tool result via {{step_N}}, never hardcoded.
+- Never use json_reader to re-read or cache results from prior steps — prior step results are available via {{step_N}} placeholders. json_reader is only for reading pre-existing configuration files on disk.
 - Dependencies use #S<N> notation (e.g., #S1, #S2). Use "None" if none.
 - Keep tasks specific and actionable.
 
@@ -72,11 +76,65 @@ _OUTPUT_RE = re.compile(r"#ExpectedOutput(\d+):\s*(.+)")
 _DEP_NUM_RE = re.compile(r"#S(\d+)")
 
 
+# Valid agent and tool names — used by _clean() to validate extracted names.
+_KNOWN_AGENTS = {"IoTAgent", "FMSRAgent", "TSFMAgent", "Utilities"}
+_KNOWN_TOOLS  = {
+    "sites", "assets", "sensors", "history",
+    "get_failure_modes", "get_failure_mode_sensor_mapping",
+    "run_integrated_tsad", "run_tsfm_forecasting",
+    "json_reader", "current_date_time", "current_time_english",
+    "none", "null",
+}
+
+
+def _clean(s: str) -> str:
+    """Extract the bare agent or tool name from an LLM-generated line.
+
+    Handles these LLM failure modes:
+      'FMSRAgent  # this step uses the LLM'   → 'FMSRAgent'
+      'get_failure_modes (for chiller)'        → 'get_failure_modes'
+      'IoTAgent is not suitable for this...'  → 'IoTAgent'
+
+    Strategy:
+      1. Strip everything after '#' or '('
+      2. If result is a known name, return it
+      3. Otherwise scan the original string for the first known name token
+      4. Fall back to the first whitespace-delimited token
+    """
+    # step 1 — strip comment/paren suffixes
+    candidate = s.split("#")[0].split("(")[0].strip()
+    if candidate in _KNOWN_AGENTS or candidate in _KNOWN_TOOLS:
+        return candidate
+
+    # step 2 — scan for any known token in the original string
+    for token in s.replace(".", " ").replace(",", " ").split():
+        if token in _KNOWN_AGENTS or token in _KNOWN_TOOLS:
+            return token
+
+    # step 3 — return first token (best effort)
+    return candidate.split()[0] if candidate.split() else candidate
+
+
+def _extract_last_plan_block(raw: str) -> str:
+    """Return only the last complete plan block from the LLM response.
+
+    The LLM sometimes self-corrects and writes multiple versions of the plan
+    in a single response. The regex would then mix steps from different versions
+    (e.g. step 1 from version 3, step 2 from version 2), producing a broken plan.
+
+    We find the last occurrence of '#Task1:' and parse only from that point,
+    so we always use the final plan the LLM committed to.
+    """
+    last = raw.rfind("#Task1:")
+    return raw[last:] if last != -1 else raw
+
+
 def parse_plan(raw: str) -> Plan:
     """Parse an LLM-generated plan string into a Plan object."""
-    tasks = {int(m.group(1)): m.group(2).strip() for m in _TASK_RE.finditer(raw)}
-    agents = {int(m.group(1)): m.group(2).strip() for m in _AGENT_RE.finditer(raw)}
-    tools = {int(m.group(1)): m.group(2).strip() for m in _TOOL_RE.finditer(raw)}
+    raw    = _extract_last_plan_block(raw)
+    tasks  = {int(m.group(1)): m.group(2).strip()  for m in _TASK_RE.finditer(raw)}
+    agents = {int(m.group(1)): _clean(m.group(2))  for m in _AGENT_RE.finditer(raw)}
+    tools  = {int(m.group(1)): _clean(m.group(2))  for m in _TOOL_RE.finditer(raw)}
     deps_raw = {int(m.group(1)): m.group(2).strip() for m in _DEP_RE.finditer(raw)}
     outputs = {int(m.group(1)): m.group(2).strip() for m in _OUTPUT_RE.finditer(raw)}
 

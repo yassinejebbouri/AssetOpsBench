@@ -40,7 +40,11 @@ DEFAULT_SERVER_PATHS: dict[str, Path | str] = {
     "TSFMAgent": "tsfm-mcp-server",
 }
 
-_PLACEHOLDER_RE = re.compile(r"\{step_(\d+)\}")
+# Matches {step_N}, {step_N[i]}, {step_N[?].field} and similar — the LLM
+# sometimes generates indexed or attribute-access forms including non-numeric
+# indices like [?].  We extract only the step number and ignore the
+# index/attribute; _infer_param extracts the right field by key name.
+_PLACEHOLDER_RE = re.compile(r"\{step_(\d+)(?:\[[^\]]*\])?(?:\.\w+)?\}")
 
 _ARG_RESOLUTION_PROMPT = """\
 You are resolving tool argument values for one step in a multi-step plan.
@@ -165,6 +169,10 @@ class Executor:
             else:
                 resolved_args = step.tool_args
 
+            # Correct hallucinated arg values (e.g. "Chiller_6_id") even when
+            # the planner didn't use a {step_N} placeholder at all.
+            resolved_args = _fix_hardcoded_args(resolved_args, context)
+
             # Prune FM x sensor grid before the mapping call if enabled
             step_metadata: dict = {}
             if (
@@ -216,6 +224,37 @@ class Executor:
                 response = await _call_tool(server_path, step.tool, resolved_args)
             wall_s = round(time.perf_counter() - t0, 4)
 
+            hw = HardwareMetrics(
+                wall_time_s=prof.wall_time_s,
+                cpu_percent_peak=prof.cpu_percent_peak,
+                ram_mb_start=prof.ram_mb_start,
+                ram_mb_peak=prof.ram_mb_peak,
+                ram_mb_end=prof.ram_mb_end,
+                io_read_bytes=prof.io_read_bytes,
+            )
+
+            # Detect tool-level errors returned as {"error": "..."} JSON.
+            # Without this, a failed sensors() call is silently marked success
+            # and the empty response corrupts all downstream steps.
+            tool_err = _extract_tool_error(response)
+            if tool_err:
+                _log.warning(
+                    "Step %d: %s.%s returned error: %s",
+                    step.step_number, step.agent, step.tool, tool_err,
+                )
+                return StepResult(
+                    step_number=step.step_number,
+                    task=step.task,
+                    agent=step.agent,
+                    response=response,
+                    error=f"Tool returned error: {tool_err}",
+                    tool=step.tool,
+                    tool_args=resolved_args,
+                    wall_s=wall_s,
+                    metadata=step_metadata,
+                    hardware=hw,
+                )
+
             return StepResult(
                 step_number=step.step_number,
                 task=step.task,
@@ -225,14 +264,7 @@ class Executor:
                 tool_args=resolved_args,
                 wall_s=wall_s,
                 metadata=step_metadata,
-                hardware=HardwareMetrics(
-                    wall_time_s=prof.wall_time_s,
-                    cpu_percent_peak=prof.cpu_percent_peak,
-                    ram_mb_start=prof.ram_mb_start,
-                    ram_mb_peak=prof.ram_mb_peak,
-                    ram_mb_end=prof.ram_mb_end,
-                    io_read_bytes=prof.io_read_bytes,
-                ),
+                hardware=hw,
             )
         except Exception as exc:  # noqa: BLE001
             return StepResult(
@@ -248,6 +280,23 @@ class Executor:
 
 # ── arg resolution ────────────────────────────────────────────────────────────
 
+# Maps each tool argument name to the JSON keys that may carry its value in a
+# prior step's response.  Derived from the actual return schemas of every tool:
+#
+#   sites()                → {"sites": [...]}
+#   assets()               → {"assets": [...], "site_name": ..., ...}
+#   sensors()              → {"sensors": [...], "asset_id": ..., "site_name": ...}
+#   get_failure_modes()    → {"failure_modes": [...], "asset_name": ...}
+#
+# Add a new entry here whenever a new tool argument is introduced.
+_ARG_ALIASES: dict[str, list[str]] = {
+    "asset_id":      ["asset_id", "assets", "asset_ids"],
+    "asset_name":    ["asset_name", "assets", "asset_id"],
+    "site_name":     ["site_name", "sites"],
+    "sensors":       ["sensors", "sensor_list", "sensor_names"],
+    "failure_modes": ["failure_modes", "failure_mode_list", "modes"],
+}
+
 
 def _has_placeholders(args: dict) -> bool:
     """Return True if any string arg value contains a {{step_N}} placeholder."""
@@ -257,6 +306,101 @@ def _has_placeholders(args: dict) -> bool:
     )
 
 
+def _infer_param(arg_key: str, response: str) -> object:
+    """Deterministically extract arg_key from a JSON step response.
+
+    Tries in order:
+      1. Exact key match  — response has a key whose name == arg_key
+      2. Alias match      — response has a key listed in _ARG_ALIASES[arg_key]
+
+    Single-element lists are unwrapped to scalars ("Chiller 6" not ["Chiller 6"]).
+    Multi-element lists are returned as-is (caller receives the full list).
+    Returns None if nothing matches — caller falls back to LLM.
+    """
+    if not response:
+        return None
+    try:
+        data = json.loads(response)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    def _unwrap(val: object) -> object:
+        if isinstance(val, list) and len(val) == 1:
+            return val[0]
+        return val
+
+    # 1. exact key
+    if arg_key in data:
+        return _unwrap(data[arg_key])
+
+    # 2. alias
+    for alias in _ARG_ALIASES.get(arg_key, []):
+        if alias in data:
+            return _unwrap(data[alias])
+
+    return None
+
+
+# Arg keys whose values should always come from a tool response (never be
+# hardcoded by the LLM).  When the planner forgets to use a {step_N}
+# placeholder and writes a hallucinated ID like "Chiller_6_id", we silently
+# correct it by extracting the real value from the nearest prior step result.
+_ALWAYS_INFER_KEYS = {"asset_id", "asset_name"}
+
+
+def _fix_hardcoded_args(args: dict, context: dict[int, StepResult]) -> dict:
+    """Replace hallucinated arg values with ones extracted from prior step results.
+
+    Called even when there are no {step_N} placeholders — the LLM sometimes
+    writes concrete-looking IDs (e.g. "Chiller_6_id", "CH-6") instead of
+    using a placeholder.  For known sensitive keys we scan all prior step
+    responses and override if a better value can be found deterministically.
+    """
+    if not context:
+        return args
+    fixed = dict(args)
+    for key in _ALWAYS_INFER_KEYS:
+        if key not in args:
+            continue
+        current_val = args[key]
+        if not isinstance(current_val, str):
+            continue
+        if _PLACEHOLDER_RE.search(current_val):
+            continue  # will be handled by placeholder resolution
+        # Try each prior step in execution order (earliest first so that, e.g.,
+        # an assets() result from step 1 takes precedence over later steps).
+        for n in sorted(context):
+            extracted = _infer_param(key, context[n].response)
+            if extracted is not None and isinstance(extracted, str):
+                if extracted != current_val:
+                    _log.info(
+                        "Corrected hardcoded '%s'='%s' → '%s' (from step %d context)",
+                        key, current_val, extracted, n,
+                    )
+                    fixed[key] = extracted
+                break  # found authoritative source, stop searching
+    return fixed
+
+
+def _extract_tool_error(response: str) -> str | None:
+    """Return the error message if the tool returned an ErrorResult, else None.
+
+    Matches {"error": "some message"} — the shape returned by both IoTAgent
+    and FMSRAgent when a tool call fails (unknown asset, LLM unavailable, etc.).
+    """
+    if not response:
+        return None
+    try:
+        data = json.loads(response)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if isinstance(data, dict) and set(data.keys()) == {"error"}:
+        return str(data["error"])
+    return None
+
+
 async def _resolve_args_with_llm(
     task: str,
     tool: str,
@@ -264,13 +408,14 @@ async def _resolve_args_with_llm(
     context: dict[int, StepResult],
     llm: LLMBackend,
 ) -> dict:
-    """Use the LLM to resolve {{step_N}} placeholders from prior step results.
+    """Resolve {step_N} placeholders — deterministic extraction first, LLM as fallback.
 
-    Args that have no placeholders are passed through unchanged.
-    Args with placeholders are resolved by an LLM call using the referenced
-    step results as context.
+    For each placeholder arg:
+      1. Parse the referenced step's JSON response.
+      2. Try _infer_param() — exact key match then alias match.
+      3. Only call the LLM if _infer_param() returns None.
 
-    Returns the fully resolved args dict.
+    This prevents hallucinated values like "ID_of_Chiller_6" from reaching tools.
     """
     known: dict = {}
     unresolved: dict = {}
@@ -280,33 +425,58 @@ async def _resolve_args_with_llm(
         else:
             known[key] = val
 
-    # Collect the step results referenced by any placeholder
-    referenced = {
-        int(m.group(1))
-        for val in unresolved.values()
-        for m in _PLACEHOLDER_RE.finditer(val)
-    }
-    context_text = "\n".join(
-        f"Step {n}: {context[n].response}"
-        for n in sorted(referenced)
-        if n in context
-    )
-    unresolved_text = "\n".join(
-        f"  {k} (placeholder: {v})" for k, v in unresolved.items()
-    )
+    resolved: dict = {}
+    needs_llm: dict = {}
 
-    prompt = _ARG_RESOLUTION_PROMPT.format(
-        task=task,
-        tool=tool,
-        context=context_text or "(none)",
-        unresolved=unresolved_text,
-    )
-    raw = llm.generate(prompt)
+    for arg_key, placeholder_val in unresolved.items():
+        step_nums = [int(m.group(1)) for m in _PLACEHOLDER_RE.finditer(placeholder_val)]
+        if not step_nums:
+            needs_llm[arg_key] = placeholder_val
+            continue
 
-    # Parse the LLM response as JSON
-    resolved_values = _parse_json(raw)
+        # use the most recently referenced step
+        ref_n = step_nums[-1]
+        prior = context[ref_n].response if ref_n in context else ""
+        extracted = _infer_param(arg_key, prior)
 
-    return {**known, **resolved_values}
+        if extracted is not None:
+            _log.info(
+                "Step arg '%s' resolved deterministically from step %d: %s",
+                arg_key, ref_n, repr(extracted)[:80],
+            )
+            resolved[arg_key] = extracted
+        else:
+            _log.warning(
+                "Step arg '%s' could not be extracted from step %d — falling back to LLM.",
+                arg_key, ref_n,
+            )
+            needs_llm[arg_key] = placeholder_val
+
+    # LLM fallback only for args that deterministic extraction couldn't handle
+    if needs_llm:
+        referenced = {
+            int(m.group(1))
+            for val in needs_llm.values()
+            for m in _PLACEHOLDER_RE.finditer(val)
+        }
+        context_text = "\n".join(
+            f"Step {n}: {context[n].response}"
+            for n in sorted(referenced)
+            if n in context
+        )
+        unresolved_text = "\n".join(
+            f"  {k} (placeholder: {v})" for k, v in needs_llm.items()
+        )
+        prompt = _ARG_RESOLUTION_PROMPT.format(
+            task=task,
+            tool=tool,
+            context=context_text or "(none)",
+            unresolved=unresolved_text,
+        )
+        raw = llm.generate(prompt)
+        resolved.update(_parse_json(raw))
+
+    return {**known, **resolved}
 
 
 def _parse_json(raw: str) -> dict:

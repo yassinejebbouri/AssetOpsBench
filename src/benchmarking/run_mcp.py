@@ -192,6 +192,7 @@ async def run_scenario(runner: PlanExecuteRunner, scenario: dict, run_id: int) -
         return {
             **base,
             "status": status,
+            "answer": result.answer,
             "errors": errors,
             "n_steps": len(steps),
             "n_failed_steps": sum(1 for s in steps if not s["success"]),
@@ -207,6 +208,7 @@ async def run_scenario(runner: PlanExecuteRunner, scenario: dict, run_id: int) -
         return {
             **base,
             "status": "error",
+            "answer": "",
             "errors": [str(exc)],
             "steps": [],
             "n_steps": 0,
@@ -298,6 +300,13 @@ async def main(n_runs: int, warmup: int, include_wo: bool,
                 cpu = record.get("peak_cpu_percent", 0.0)
                 ram = record.get("peak_ram_mb", 0.0)
 
+                # print every step so you can see what the agent did
+                for s in record.get("steps", []):
+                    icon = "+" if s["success"] else "X"
+                    print(f"    [{icon}] step {s['step_number']}: {s['agent']}.{s['tool']}")
+                    if s.get("error"):
+                        print(f"        !! {s['error'][:200]}")
+
                 if record["status"] == "success":
                     print(
                         f"  run {run_id} [{status_flag}]"
@@ -310,6 +319,10 @@ async def main(n_runs: int, warmup: int, include_wo: bool,
                     print(f"  run {run_id} [{status_flag}] steps={n_steps} failed={n_failed}")
                     for err in record.get("errors", []):
                         print(f"    !! {err}")
+
+                answer = record.get("answer", "")
+                if answer:
+                    print(f"  Answer: {answer[:300]}{'...' if len(answer) > 300 else ''}")
 
                 wandb.log({
                     "scenario_id": sid,
